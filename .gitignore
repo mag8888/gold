@@ -1,0 +1,39 @@
+# Секретные файлы
+.env
+credentials.json
+*.key
+*.pem
+
+# Файлы Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+
+# Логи и временные файлы
+*.log
+*.tmp
+*.swp
+
+# IDE и редакторы
+.idea/
+.vscode/
+*.code-workspace
+
+# Вендорные зависимости (если используете)
+venv/
+.env/
+.ssh/config
+config
+
+# Для ботов на aiogram
+webhook_url.txt
+bot.session
+
+# Для баз данных
+*.db
+*.sqlite
+/database/migrations/
+
+# Для Google Sheets
+service_account_*.json

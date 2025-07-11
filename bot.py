@@ -16,7 +16,7 @@ dp = Dispatcher()
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_name(os.getenv("GOOGLE_SHEETS_CREDS"), scope)
 client = gspread.authorize(creds)
-sheet = client.open("BotData").sheet1  # Ваше название таблицы
+sheet = client.open_by_key(os.getenv("SPREADSHEET_ID")).sheet1
 
 # Команда /start
 @dp.message(Command("start"))

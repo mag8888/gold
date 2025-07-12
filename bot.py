@@ -71,13 +71,13 @@ class Onboarding(StatesGroup):
     lifestyle = State()
     social = State()
 
-# Main menu keyboard
+# --- Клавиатура главного меню ---
 menu_kb = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton("📁 Меню"), KeyboardButton("🤝 Партнеры")],
-        [KeyboardButton("🎯 Мои цели")],
-        [KeyboardButton("🆔 Визитка"), KeyboardButton("🎓 Обучение")],
-        [KeyboardButton("🌐 Нетворкинг")]
+        [KeyboardButton(text="📁 Меню"), KeyboardButton(text="🤝 Партнёры")],
+        [KeyboardButton(text="🎯 Мои цели")],
+        [KeyboardButton(text="🆔 Визитка"), KeyboardButton(text="🎓 Обучение")],
+        [KeyboardButton(text="🌐 Нетворкинг")]
     ],
     resize_keyboard=True
 )

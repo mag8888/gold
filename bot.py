@@ -33,7 +33,7 @@ openai.api_key = OPENAI_API_KEY
 # Telegram bot initialization
 bot = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
-dp = Dispatcher(bot, storage=storage)
+dp = Dispatcher(storage=storage)
 
 # Google Sheets initialization
 gscope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]

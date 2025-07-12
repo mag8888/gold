@@ -78,8 +78,10 @@ menu_kb = ReplyKeyboardMarkup(
         [KeyboardButton("🎯 Мои цели")],
         [KeyboardButton("🆔 Визитка"), KeyboardButton("🎓 Обучение")],
         [KeyboardButton("🌐 Нетворкинг")]
-    ], resize_keyboard=True
+    ],
+    resize_keyboard=True
 )
+
 
 # Start command
 @dp.message(Command("start"))

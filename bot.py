@@ -29,6 +29,10 @@ logger = logging.getLogger(__name__)
 
 # Инициализация бота
 BOT_TOKEN = os.getenv('BOT_TOKEN')
+if not BOT_TOKEN:
+    logger.error("BOT_TOKEN not found in environment variables")
+    raise ValueError("BOT_TOKEN is required")
+
 bot = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
@@ -170,7 +174,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
         db.create_user(user_id, first_name, last_name, username)
         
         # Отправляем приветственное сообщение
-        welcome_text = f"Здравствуйте, {first_name}!\n\nДобро пожаловать в SynergyNet - сообщество проактивных людей! 🚀\n\nХочешь заполнить визитку?"
+        welcome_text = f"Здравствуйте, {first_name}!\n\nДобро пожаловать в AlteriA пространство саморазвития! 🚀\n\nХочешь заполнить визитку?"
         
         await message.answer(
             welcome_text,
@@ -282,7 +286,7 @@ async def skip_onboarding(callback: types.CallbackQuery, state: FSMContext):
         reply_markup=None
     )
     await callback.message.answer(
-        "Добро пожаловать в SynergyNet! 🎉",
+        "Добро пожаловать в AlteriA! 🎉",
         reply_markup=get_main_menu_keyboard()
     )
     await callback.answer()
@@ -435,7 +439,7 @@ async def select_category(callback: types.CallbackQuery, state: FSMContext):
         
         await callback.message.edit_text(
             f"✅ Отлично! Ваш профиль сохранен в категории {selected_category['category_emoji']} {selected_category['category_name']}\n\n"
-            "Добро пожаловать в SynergyNet! 🎉",
+            "Добро пожаловать в AlteriA! 🎉",
             reply_markup=None
         )
         
@@ -848,7 +852,7 @@ async def main():
     """Главная функция запуска бота"""
     global scheduler
     
-    logger.info("Starting SynergyNet bot...")
+    logger.info("Starting AlteriA bot...")
     
     # Инициализируем базу данных
     db.init_database()

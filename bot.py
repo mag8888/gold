@@ -1,430 +1,317 @@
 import os
-import atexit
 import logging
-import random
+from typing import Optional, Dict, List
 from datetime import datetime
-from typing import Any
-
-from aiogram import Bot, Dispatcher, types, filters
-from aiogram.filters import Command
-from aiogram.filters import Command, ContentTypeFilter
-from aiogram.types import (
-    ReplyKeyboardMarkup, KeyboardButton,
-    InlineKeyboardMarkup, InlineKeyboardButton, ContentType,
-    CallbackQuery
+import requests
+import pytz
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Updater, 
+    CommandHandler, 
+    CallbackQueryHandler, 
+    CallbackContext,
+    MessageHandler,
+    Filters
 )
-from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.fsm.state import StatesGroup, State
-from aiogram.fsm.context import FSMContext
-from dotenv import load_dotenv
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import openai
 
-# Logging
-logging.basicConfig(level=logging.INFO)
+# ===== CONFIGURATION =====
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO,
+    handlers=[
+        logging.FileHandler('gold_bot.log'),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-load_dotenv()
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
-CREDS_PATH = os.getenv("GOOGLE_SHEETS_CREDS")
+# Configuration (should use environment variables in production)
+CONFIG = {
+    'TELEGRAM_TOKEN': os.getenv('TELEGRAM_TOKEN', 'YOUR_TELEGRAM_TOKEN'),
+    'API_BASE_URL': os.getenv('API_BASE_URL', 'https://api.example.com/gold'),
+    'API_KEY': os.getenv('GOLD_API_KEY', 'YOUR_API_KEY'),
+    'CACHE_TTL': 300,  # 5 minutes cache
+    'ADMIN_IDS': [12345678],  # List of admin user IDs
+    'TIMEZONE': 'Europe/Moscow'
+}
 
-# OpenAI setup
-openai.api_key = OPENAI_API_KEY
+# ===== CACHE SYSTEM =====
+class PriceCache:
+    _instance = None
+    last_price = None
+    last_update = None
+    history = []
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(PriceCache, cls).__new__(cls)
+        return cls._instance
+    
+    def update(self, price: float) -> None:
+        self.last_price = price
+        self.last_update = datetime.now(pytz.timezone(CONFIG['TIMEZONE']))
+        self.history.append((price, self.last_update))
+        if len(self.history) > 100:  # Keep last 100 records
+            self.history.pop(0)
+    
+    def is_valid(self) -> bool:
+        if not self.last_update:
+            return False
+        return (datetime.now(pytz.timezone(CONFIG['TIMEZONE'])) - self.last_update).seconds < CONFIG['CACHE_TTL']
 
-# Telegram bot & FSM setup
-bot = Bot(token=BOT_TOKEN)
-storage = MemoryStorage()
-dp = Dispatcher(storage=storage)
+# ===== API FUNCTIONS =====
+def fetch_gold_price() -> Optional[float]:
+    """Fetch current gold price from API"""
+    try:
+        headers = {"Authorization": f"Bearer {CONFIG['API_KEY']}"}
+        params = {"currency": "USD"}
+        response = requests.get(
+            f"{CONFIG['API_BASE_URL']}/price",
+            headers=headers,
+            params=params,
+            timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+        return float(data.get('price'))
+    except (requests.exceptions.RequestException, ValueError) as e:
+        logger.error(f"API request failed: {e}")
+        return None
 
-# Google Sheets setup
-gscope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name(CREDS_PATH, gscope)
-client = gspread.authorize(creds)
-main_sheet = client.open_by_key(SPREADSHEET_ID)
+def get_gold_price() -> Optional[float]:
+    """Get gold price with cache support"""
+    cache = PriceCache()
+    
+    if cache.is_valid():
+        logger.debug("Returning cached price")
+        return cache.last_price
+    
+    current_price = fetch_gold_price()
+    if current_price is not None:
+        cache.update(current_price)
+    
+    return current_price
 
-# Buffer setup for all worksheets
-SHEET_NAMES = [
-    "Onboarding", "Participants", "Mentors", "MentorLikes",
-    "Tips", "TipReactions", "Referrals", "Journal", "Quests",
-    "QuestResults", "SupportWheel", "Audio", "Events", "Categories"
-]
-WORKSHEETS: dict[str, gspread.Worksheet] = {name: main_sheet.worksheet(name) for name in SHEET_NAMES}
-_BUFFERS: dict[str, list[list[Any]]] = {name: [] for name in SHEET_NAMES}
-BATCH_SIZE = 5
-
-def flush_buffer(sheet_name: str) -> None:
-    buf = _BUFFERS[sheet_name]
-    if buf:
-        WORKSHEETS[sheet_name].append_rows(buf)
-        _BUFFERS[sheet_name].clear()
-
-@atexit.register
-def _flush_all() -> None:
-    for name in SHEET_NAMES:
-        flush_buffer(name)
-
-def buffer_row(sheet_name: str, row: list[Any]) -> None:
-    buf = _BUFFERS[sheet_name]
-    buf.append(row)
-    if len(buf) >= BATCH_SIZE:
-        flush_buffer(sheet_name)
-
-# FSM States for Onboarding
-class Onboarding(StatesGroup):
-    name = State()
-    surname = State()
-    about = State()
-    product = State()
-    cases = State()
-    why_net = State()
-    values = State()
-    goals = State()
-    lifestyle = State()
-    social = State()
-
-# Main menu keyboard
-menu_kb = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="📁 Меню"), KeyboardButton(text="🤝 Партнёры")],
-        [KeyboardButton(text="🎯 Мои цели")],
-        [KeyboardButton(text="🆔 Визитка"), KeyboardButton(text="🎓 Обучение")],
-        [KeyboardButton(text="🌐 Нетворкинг")]
-    ],
-    resize_keyboard=True
-)
-
-
-# Start command
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message, state: FSMContext):
-    # Send 4 welcome images
-    for img in ["img1.jpg", "img2.jpg", "img3.jpg", "img4.jpg"]:
-        await bot.send_photo(message.chat.id, img)
-    user = message.from_user.full_name or message.from_user.username
-    kb = InlineKeyboardMarkup(row_width=2)
-    kb.add(
-        InlineKeyboardButton(text="✅ Да", callback_data="vb_yes"),
-        InlineKeyboardButton(text="❌ Нет", callback_data="vb_no")
-    )
-    await message.answer(f"Здравствуйте, {user}!\nХочешь заполнить визитку?", reply_markup=kb)
-
-@dp.callback_query(lambda c: c.data in ["vb_yes","vb_no"])
-async def process_vb_choice(c: CallbackQuery, state: FSMContext):
-    await c.answer()
-    if c.data == "vb_no":
-        await c.message.answer("Главное меню:", reply_markup=menu_kb)
-    else:
-        await c.message.answer("1/10. Как тебя зовут?")
-        await Onboarding.name.set()
-
-# helper
-async def ask_next(message: types.Message, state: FSMContext, next_state: State, prompt: str, pos: int):
-    await state.update_data(position=pos)
-    await message.answer(f"{pos}/10. {prompt}")
-    await next_state.set()
-
-# Onboarding handlers
-@dp.message(Onboarding.name)
-async def process_name(message: types.Message, state: FSMContext):
-    await state.update_data(name=message.text)
-    await ask_next(message, state, Onboarding.surname, "Введи фамилию:", 2)
-
-# ... Repeat for each state ...
-
-@dp.message(Onboarding.social)
-async def process_social(message: types.Message, state: FSMContext):
-    await state.update_data(social=message.text)
-    data = await state.get_data()
-    # Generate card
-    prompt = "Сформируй визитку в Markdown по данным: " + str(data)
-    resp = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role":"system","content":"Ты делаешь визитку."},
-            {"role":"user","content":prompt}
+# ===== BOT COMMANDS =====
+def start(update: Update, context: CallbackContext) -> None:
+    """Handle /start command"""
+    try:
+        user = update.effective_user
+        welcome_msg = (
+            f"🛠 Привет, {user.first_name}!\n\n"
+            "🔹 Я бот для отслеживания цен на золото.\n"
+            "🔹 Доступные команды:\n"
+            "/price - текущая цена\n"
+            "/history - история цен\n"
+            "/subscribe - подписаться на обновления\n"
+            "/help - справка"
+        )
+        
+        keyboard = [
+            [InlineKeyboardButton("Текущая цена", callback_data='quick_price')],
+            [InlineKeyboardButton("История цен", callback_data='price_history')]
         ]
-    )
-    card = resp.choices[0].message.content
-    await message.answer(card, parse_mode="Markdown")
-    # Save data
-    buffer_row("Participants", [
-        message.from_user.id, message.from_user.username,
-        data.get("name",""), data.get("surname",""),
-        data.get("about",""), data.get("product",""),
-        data.get("cases",""), data.get("why_net",""),
-        data.get("values",""), data.get("goals",""),
-        data.get("lifestyle",""), data.get("social",""),
-        datetime.utcnow().isoformat()
-    ])
-    # Management buttons
-    kb = InlineKeyboardMarkup(row_width=2)
-    kb.add(
-        InlineKeyboardButton(text="💾 Сохранить", callback_data="save_card"),
-        InlineKeyboardButton(text="🔄 Перегенерировать", callback_data="regen_card")
-    )
-    kb.add(
-        InlineKeyboardButton(text="✏️ Изменить", callback_data="edit_card"),
-        InlineKeyboardButton(text="🔙 Меню", callback_data="menu")
-    )
-    await message.answer("Что дальше?", reply_markup=kb)
-    await state.clear()
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        update.message.reply_text(welcome_msg, reply_markup=reply_markup)
+        logger.info(f"User {user.id} started the bot")
+        
+    except Exception as e:
+        logger.error(f"Error in start command: {e}")
+        send_error_message(update)
 
-# Mentor catalog
-@dp.message(Command("mentors"))
-async def cmd_mentors(message: types.Message):
-    data = WORKSHEETS["Mentors"].get_all_records()
-    if not data:
-        return await message.answer("В каталоге пока нет наставников.")
-    kb = InlineKeyboardMarkup(row_width=1)
-    for r in data:
-        kb.add(InlineKeyboardButton(text=f"{r['name']} ({r['category']})", callback_data=f"mentor:{r['mentor_id']}"))
-    await message.answer("Выберите наставника:", reply_markup=kb)
-
-@dp.callback_query(lambda c: c.data.startswith("mentor:"))
-async def process_mentor_choice(c: CallbackQuery):
-    mid = int(c.data.split(":")[1])
-    rec = next((r for r in WORKSHEETS['Mentors'].get_all_records() if r['mentor_id']==mid), None)
-    if not rec:
-        return await c.message.edit_text("Наставник не найден.")
-    text = (f"👤 <b>{rec['name']}</b>\nКатегория: {rec['category']}\nОпыт: {rec['experience']}\n\n{rec['description']}")
-    kb = InlineKeyboardMarkup(row_width=2)
-    kb.add(
-        InlineKeyboardButton(text="👍 Нравится", callback_data=f"mentor_like:{mid}"),
-        InlineKeyboardButton(text="💬 Отзыв", callback_data=f"mentor_review:{mid}")
-    )
-    kb.add(InlineKeyboardButton(text="Выбрать", callback_data=f"mentor_select:{mid}"))
-    await c.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
-
-@dp.callback_query(lambda c: c.data.startswith("mentor_like:"))
-async def process_mentor_like(c: CallbackQuery):
-    mid = int(c.data.split(":")[1])
-    buffer_row("MentorLikes", [c.from_user.username, mid, 'like', datetime.utcnow().isoformat()])
-    await c.answer("Спасибо за лайк!")
-
-@dp.callback_query(lambda c: c.data.startswith("mentor_review:"))
-async def process_mentor_review(c: CallbackQuery, state: FSMContext):
-    mid = int(c.data.split(":")[1])
-    await state.update_data(review_mid=mid)
-    await c.message.answer("Напишите ваш отзыв о наставнике:")
-    await state.set_state(Onboarding.about)  # reuse state
-
-# Tips
-@dp.message(Command("tips"))
-async def cmd_tips(message: types.Message):
-    recs = tips_ws.get_all_records()
-    if not recs:
-        return await message.answer("Советов нет.")
-    tip = random.choice(recs)
-    kb = InlineKeyboardMarkup(row_width=3)
-    kb.add(
-        InlineKeyboardButton("💾 Сохранить", callback_data=f"tip_save:{tip['tip_id']}"),
-        InlineKeyboardButton("➡️ Отправить", callback_data=f"tip_send:{tip['tip_id']}"),
-        InlineKeyboardButton("❤️", callback_data=f"tip_like:{tip['tip_id']}")
-    )
-    await message.answer(f"💡 Совет #{tip['tip_id']}: {tip['text']}", reply_markup=kb)
-
-@dp.callback_query(lambda c: c.data.startswith("tip_"))
-async def process_tip_action(c: CallbackQuery, state: FSMContext):
-    action, sid = c.data.split(":")
-    tid = int(sid)
-    tip_reactions_ws.append_row([c.from_user.username, tid, action, datetime.utcnow().isoformat()])
-    if action == 'tip_send':
-        await state.update_data(pending_tip=tid)
-        await c.message.answer("Кому отправить? Напиши username без @:")
-    else:
-        await c.answer("Сохранено", show_alert=True)
-
-@dp.message(lambda m: True)
-async def handle_tip_send(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    if 'pending_tip' in data:
-        rec = next(r for r in tips_ws.get_all_records() if r['tip_id']==data['pending_tip'])
-        target = message.text.strip().lstrip('@')
-        try:
-            await bot.send_message(target, f"💡 Совет от @{message.from_user.username}: {rec['text']}")
-            await message.answer("Отправлено!")
-        except:
-            await message.answer("Ошибка! Проверьте username.")
-        await state.clear()
-
-# Referral
-@dp.message(Command("ref"))
-async def cmd_ref(message: types.Message):
-    link = f"https://t.me/{(await bot.get_me()).username}?start={message.from_user.id}"
-    await message.answer(f"Твоя реф. ссылка:\n{link}")
-
-@dp.message(Command("start"))
-async def cmd_start_ref(message: types.Message):
-    args = message.get_args()
-    if args.isdigit():
-        ref = int(args)
-        if ref != message.from_user.id:
-            referrals_ws.append_row([ref, message.from_user.id, datetime.utcnow().isoformat()])
-
-@dp.message(Command("refstats"))
-async def cmd_refstats(message: types.Message):
-    rows = referrals_ws.get_all_records()
-    mine = [r for r in rows if r['referrer_id']==message.from_user.id]
-    await message.answer(f"Приглашено: {len(mine)}")
-
-# Participants
-@dp.message(Command("register"))
-async def cmd_register(message: types.Message):
-    await message.answer("Заполни визитку через /start, пожалуйста.")
-
-@dp.message(Command("find"))
-async def cmd_find(message: types.Message):
-    args = message.get_args().lower()
-    if '=' not in args:
-        return await message.answer("Используй `/find ключ=значение`.")
-    key,val = args.split('=',1)
-    allp = participants_ws.get_all_records()
-    res = [p for p in allp if val in str(p.get(key,'')).lower()]
-    if not res:
-        return await message.answer("Не найдено.")
-    msg = '\n'.join(f"👤 {p['name']} (@{p['username']})" for p in res[:10])
-    await message.answer(msg)
-
-# Journal
-@dp.message(Command("journal"))
-async def cmd_journal(message: types.Message):
-    await message.answer("Что сделал сегодня? (текст/медиа)")
-    await state.set_state(Onboarding.about)
-
-@dp.message(lambda m: m.text or m.photo)
-async def process_journal(message: types.Message):
-    text = message.text or ''
-    media = ''
-    if message.photo:
-        media = (await message.photo[-1].get_file()).file_path
-    journal_ws.append_row([
-        message.from_user.id, message.from_user.username,
-        datetime.utcnow().date().isoformat(), text, media,
-        datetime.utcnow().isoformat()
-    ])
-    await message.answer("Запись сохранена!")
-
-@dp.message(Command("streak"))
-async def cmd_streak(message: types.Message):
-    rows = journal_ws.get_all_records()
-    mine = [r for r in rows if r['user_id']==message.from_user.id]
-    dates = sorted({r['date'] for r in mine}, reverse=True)
-    streak = 0
-    today = datetime.utcnow().date()
-    from datetime import timedelta
-    for i in range(len(dates)):
-        if dates[i] == (today - timedelta(days=i)).isoformat():
-            streak += 1
+def price(update: Update, context: CallbackContext) -> None:
+    """Handle /price command"""
+    try:
+        current_price = get_gold_price()
+        cache = PriceCache()
+        
+        if current_price is not None:
+            last_update = cache.last_update.strftime('%d.%m.%Y %H:%M') if cache.last_update else "неизвестно"
+            
+            message = (
+                f"💰 Текущая цена на золото: {current_price:.2f} USD/унция\n"
+                f"🕒 Последнее обновление: {last_update}"
+            )
+            
+            keyboard = [
+                [InlineKeyboardButton("🔄 Обновить", callback_data='refresh_price')],
+                [InlineKeyboardButton("📈 История", callback_data='price_history'),
+                 InlineKeyboardButton("🔔 Подписаться", callback_data='subscribe')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            update.message.reply_text(message, reply_markup=reply_markup)
         else:
-            break
-    await message.answer(f"Серия: {streak} дней")
+            update.message.reply_text("⚠️ Не удалось получить текущую цену. Попробуйте позже.")
+            
+    except Exception as e:
+        logger.error(f"Error in price command: {e}")
+        send_error_message(update)
 
-# Quest
-@dp.message(Command("quest"))
-async def cmd_quest(message: types.Message):
-    q = random.choice(quests_ws.get_all_records())
-    kb = InlineKeyboardMarkup().add(
-        InlineKeyboardButton("Выполнил ✅", callback_data=f"quest_done:{q['quest_id']}")
+def history(update: Update, context: CallbackContext) -> None:
+    """Handle /history command"""
+    try:
+        cache = PriceCache()
+        
+        if not cache.history:
+            update.message.reply_text("История цен пока недоступна.")
+            return
+            
+        # Get last 7 days history
+        recent_history = cache.history[-7:]
+        history_text = "📈 История цен за последние 7 дней:\n\n"
+        
+        for price, date in recent_history:
+            history_text += f"{date.strftime('%d.%m.%Y')}: {price:.2f} USD\n"
+        
+        update.message.reply_text(history_text)
+        
+    except Exception as e:
+        logger.error(f"Error in history command: {e}")
+        send_error_message(update)
+
+# ===== HELPER FUNCTIONS =====
+def send_error_message(update: Update) -> None:
+    """Send user-friendly error message"""
+    if update and update.effective_message:
+        update.effective_message.reply_text(
+            "⚠️ Произошла ошибка. Пожалуйста, попробуйте позже.\n"
+            "Если проблема сохраняется, сообщите администратору."
+        )
+
+def format_price_message(price: float, timestamp: datetime) -> str:
+    """Format price message with emoji"""
+    trend_emoji = "➡️"
+    if len(PriceCache().history) > 1:
+        prev_price = PriceCache().history[-2][0]
+        trend_emoji = "📈" if price > prev_price else "📉" if price < prev_price else "➡️"
+    
+    return (
+        f"{trend_emoji} Новая цена на золото: {price:.2f} USD/унция\n"
+        f"🕒 Обновлено: {timestamp.strftime('%d.%m.%Y %H:%M')}"
     )
-    await message.answer(f"🎯 {q['text']}\nНаграда: {q['reward']}", reply_markup=kb)
 
-@dp.callback_query(lambda c: c.data.startswith("quest_done:"))
-async def handle_quest_done(c: CallbackQuery):
-    qid = int(c.data.split(':')[1])
-    quest_results_ws.append_row([c.from_user.id, qid, True, datetime.utcnow().isoformat()])
-    await c.answer("Квест засчитан! 🎉")
+# ===== BUTTON HANDLERS =====
+def button_handler(update: Update, context: CallbackContext) -> None:
+    """Handle inline button presses"""
+    query = update.callback_query
+    query.answer()
+    
+    try:
+        if query.data == 'refresh_price':
+            current_price = get_gold_price()
+            cache = PriceCache()
+            
+            if current_price:
+                new_text = format_price_message(current_price, cache.last_update)
+                query.edit_message_text(text=new_text)
+            else:
+                query.edit_message_text(text="⚠️ Не удалось обновить цену")
+                
+        elif query.data == 'price_history':
+            history(update, context)
+            
+        elif query.data == 'quick_price':
+            current_price = get_gold_price()
+            if current_price:
+                query.edit_message_text(text=f"💰 Текущая цена: {current_price:.2f} USD")
+            else:
+                query.edit_message_text(text="⚠️ Цена недоступна")
+                
+        elif query.data == 'subscribe':
+            query.edit_message_text(
+                text="🔔 Функция подписки в разработке. Используйте /subscribe"
+            )
+            
+    except Exception as e:
+        logger.error(f"Error in button handler: {e}")
+        query.edit_message_text(text="⚠️ Ошибка обработки запроса")
 
-# Support wheel
-@dp.message(Command("support"))
-async def cmd_support(message: types.Message):
-    parts = participants_ws.get_all_records()
-    others = [p for p in parts if p['user_id']!=message.from_user.id]
-    o = random.choice(others)
-    tip = random.choice(["Делай шаги", "Будь настойчив", "Веруй в себя"])
-    support_ws.append_row([message.from_user.username, o['username'], tip, datetime.utcnow().isoformat()])
-    await message.answer(f"🎡 Поддержка: @{o['username']} — «{tip}»")
+# ===== ADMIN COMMANDS =====
+def stats(update: Update, context: CallbackContext) -> None:
+    """Admin command: show bot statistics"""
+    try:
+        user = update.effective_user
+        if user.id not in CONFIG['ADMIN_IDS']:
+            update.message.reply_text("⛔ Доступ запрещен")
+            return
+            
+        cache = PriceCache()
+        stats_msg = (
+            "📊 Статистика бота:\n\n"
+            f"👥 Пользователей: {len(context.bot_data.get('users', []))}\n"
+            f"💰 Последняя цена: {cache.last_price if cache.last_price else 'N/A'}\n"
+            f"🕒 Последнее обновление: {cache.last_update if cache.last_update else 'N/A'}\n"
+            f"📝 Записей в истории: {len(cache.history)}"
+        )
+        
+        update.message.reply_text(stats_msg)
+        
+    except Exception as e:
+        logger.error(f"Error in stats command: {e}")
+        send_error_message(update)
 
-# Audio
-class AudioUpload(StatesGroup):
-    waiting = State()
+# ===== MAIN SETUP =====
+def main() -> None:
+    """Start the bot"""
+    try:
+        if not CONFIG['TELEGRAM_TOKEN']:
+            raise ValueError("Telegram token is not configured")
+            
+        updater = Updater(CONFIG['TELEGRAM_TOKEN'])
+        dispatcher = updater.dispatcher
 
-@dp.message(Command("audio_send"))
-async def cmd_audio_send(message: types.Message, state: FSMContext):
-    args = message.get_args().strip()
-    if not args.isdigit(): return await message.answer("/audio_send <mentor_id>")
-    await state.update_data(mid=int(args))
-    await message.answer("Пришли голосовое (.ogg)")
-    await AudioUpload.waiting.set()
+        # Register handlers
+        dispatcher.add_handler(CommandHandler("start", start))
+        dispatcher.add_handler(CommandHandler("price", price))
+        dispatcher.add_handler(CommandHandler("history", history))
+        dispatcher.add_handler(CommandHandler("stats", stats))
+        dispatcher.add_handler(CommandHandler("help", start))  # Reuse start as help
+        
+        dispatcher.add_handler(CallbackQueryHandler(button_handler))
+        dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text_message))
+        
+        dispatcher.add_error_handler(error_handler)
 
-@dp.message(ContentTypeFilter(content_types=[ContentType.VOICE]), AudioUpload.waiting)
-async def process_audio(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    audio_ws.append_row([data['mid'], message.voice.file_id, message.caption or '', datetime.utcnow().isoformat()])
-    await message.answer("Аудио сохранено!")
-    await state.clear()
+        logger.info("Starting bot...")
+        updater.start_polling()
+        logger.info("Bot is now running")
+        updater.idle()
+        
+    except Exception as e:
+        logger.critical(f"Failed to start bot: {e}")
+        raise
 
-@dp.message(Command("audios"))
-async def cmd_audios(message: types.Message):
-    args = message.get_args().strip()
-    if not args.isdigit(): return await message.answer("/audios <mentor_id>")
-    recs = [r for r in audio_ws.get_all_records() if r['mentor_id']==int(args)]
-    if not recs: return await message.answer("Аудио нет.")
-    for r in recs:
-        await message.answer_voice(r['file_id'], caption=r['caption'])
+def handle_text_message(update: Update, context: CallbackContext) -> None:
+    """Handle regular text messages"""
+    text = update.message.text.lower()
+    
+    if any(word in text for word in ['цена', 'gold', 'золот']):
+        price(update, context)
+    else:
+        update.message.reply_text(
+            "Не понял вашего сообщения. Используйте команды:\n"
+            "/start - начало работы\n"
+            "/price - текущая цена\n"
+            "/help - справка"
+        )
 
-# Events
-@dp.message(Command("events"))
-async def cmd_events(message: types.Message):
-    now = datetime.utcnow()
-    evs = []
-    for r in events_ws.get_all_records():
-        dt = datetime.fromisoformat(r['datetime'])
-        if dt>now: evs.append((dt, r))
-    if not evs: return await message.answer("Событий нет.")
-    evs = sorted(evs, key=lambda x: x[0])[:5]
-    text = "📆 Ближайшие события:\n"
-    for dt,r in evs:
-        text += f"• {r['title']} — {dt:%Y-%m-%d %H:%M}\n{r['description']}\n{r['link']}\n\n"
-    await message.answer(text)
+def error_handler(update: Update, context: CallbackContext) -> None:
+    """Handle errors"""
+    logger.error(msg="Exception while handling update:", exc_info=context.error)
+    
+    # Notify admins about critical errors
+    if isinstance(context.error, Exception):
+        for admin_id in CONFIG['ADMIN_IDS']:
+            context.bot.send_message(
+                admin_id,
+                f"⚠️ Ошибка в боте:\n{context.error}\n\n"
+                f"Update: {update.to_dict() if update else 'None'}"
+            )
+    
+    if update and update.effective_message:
+        send_error_message(update)
 
-# Card management
-@dp.callback_query(lambda c: c.data=="save_card")
-async def handle_save_card(c: CallbackQuery):
-    await c.answer()
-    kb = InlineKeyboardMarkup(row_width=3)
-    kb.add(
-        InlineKeyboardButton("👤 Коуч", callback_data="cat:Коуч"),
-        InlineKeyboardButton("⚡ Энергопрактик", callback_data="cat:Энергопрактик"),
-        InlineKeyboardButton("🧠 Психолог", callback_data="cat:Психолог")
-    )
-    await c.message.answer("Выбери категорию:", reply_markup=kb)
-
-@dp.callback_query(lambda c: c.data.startswith("cat:"))
-async def handle_cat(c: CallbackQuery):
-    cat = c.data.split(':',1)[1]
-    categories_ws.append_row([c.from_user.id, c.from_user.username, cat, datetime.utcnow().isoformat()])
-    await c.answer(f"Категория {cat} сохранена!")
-    await c.message.answer("Главное меню:", reply_markup=menu_kb)
-
-@dp.callback_query(lambda c: c.data in ["regen_card","edit_card","menu"] )
-async def handle_misc(c: CallbackQuery):
-    await c.answer()
-    if c.data=="regen_card":
-        await c.message.answer("Перегенерация в разработке.")
-    elif c.data=="edit_card":
-        await c.message.answer("Редактирование в разработке.")
-    await c.message.answer("Главное меню:", reply_markup=menu_kb)
-
-# ... (continue for all append_row calls similarly using buffer_row) ...
-
-# Fallback
-@dp.message()
-async def fallback_menu(message: types.Message):
-    await message.answer("Главное меню:", reply_markup=menu_kb)
-
-if __name__ == "__main__":
-    dp.run_polling(bot)
+if __name__ == '__main__':
+    main()

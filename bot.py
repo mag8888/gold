@@ -4,8 +4,9 @@ from typing import Optional, Dict, List
 from datetime import datetime
 import requests
 import pytz
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.filters import Command, ContentTypeFilter
     Updater, 
     CommandHandler, 
     CallbackQueryHandler, 

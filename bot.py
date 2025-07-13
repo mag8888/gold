@@ -7,13 +7,6 @@ import pytz
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command, ContentTypeFilter
-    Updater, 
-    CommandHandler, 
-    CallbackQueryHandler, 
-    CallbackContext,
-    MessageHandler,
-    Filters
-)
 
 # ===== CONFIGURATION =====
 logging.basicConfig(

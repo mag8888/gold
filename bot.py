@@ -7,7 +7,7 @@ from typing import Any
 
 from aiogram import Bot, Dispatcher, types, filters
 from aiogram.filters import Command
-from aiogram.filters.content_type import ContentTypeFilter
+from aiogram.filters import Command, ContentTypeFilter
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton,
     InlineKeyboardMarkup, InlineKeyboardButton, ContentType,
@@ -360,7 +360,7 @@ async def cmd_audio_send(message: types.Message, state: FSMContext):
     await message.answer("Пришли голосовое (.ogg)")
     await AudioUpload.waiting.set()
 
-@dp.message(AudioUpload.waiting, ContentTypeFilter(ContentType.VOICE))
+@dp.message(ContentTypeFilter(content_types=[ContentType.VOICE]), AudioUpload.waiting)
 async def process_audio(message: types.Message, state: FSMContext):
     data = await state.get_data()
     audio_ws.append_row([data['mid'], message.voice.file_id, message.caption or '', datetime.utcnow().isoformat()])

@@ -7,7 +7,7 @@ from typing import Optional, Dict, List
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters.command import Command
-from aiogram.filters.content_type import ContentTypeFilter
+from aiogram.filters import ContentTypeFilter
 from aiogram.types import (
     InlineKeyboardButton, InlineKeyboardMarkup,
     ReplyKeyboardMarkup, KeyboardButton,

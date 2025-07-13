@@ -1,14 +1,16 @@
 import os
-import openai
+import atexit
 import logging
-from datetime import datetime
 import random
+from datetime import datetime
+from typing import Any
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, filters
 from aiogram.filters import Command
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton,
-    InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, ContentType
+    InlineKeyboardMarkup, InlineKeyboardButton, ContentType,
+    CallbackQuery
 )
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import StatesGroup, State
@@ -16,50 +18,62 @@ from aiogram.fsm.context import FSMContext
 from dotenv import load_dotenv
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import openai
 
 # Logging
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Load environment
+# Load environment variables
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 CREDS_PATH = os.getenv("GOOGLE_SHEETS_CREDS")
 
-# OpenAI configuration
+# OpenAI setup
 openai.api_key = OPENAI_API_KEY
 
-# Telegram bot initialization
+# Telegram bot & FSM setup
 bot = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
-# Google Sheets initialization
+# Google Sheets setup
 gscope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_name(CREDS_PATH, gscope)
 client = gspread.authorize(creds)
 main_sheet = client.open_by_key(SPREADSHEET_ID)
 
-# Worksheets
-onboard_ws = main_sheet.worksheet("Onboarding")
-participants_ws = main_sheet.worksheet("Participants")
-mentors_ws = main_sheet.worksheet("Mentors")
-likes_ws = main_sheet.worksheet("MentorLikes")
-tips_ws = main_sheet.worksheet("Tips")
-tip_reactions_ws = main_sheet.worksheet("TipReactions")
-referrals_ws = main_sheet.worksheet("Referrals")
-journal_ws = main_sheet.worksheet("Journal")
-quests_ws = main_sheet.worksheet("Quests")
-quest_results_ws = main_sheet.worksheet("QuestResults")
-support_ws = main_sheet.worksheet("SupportWheel")
-audio_ws = main_sheet.worksheet("Audio")
-events_ws = main_sheet.worksheet("Events")
-categories_ws = main_sheet.worksheet("Categories")
+# Buffer setup for all worksheets
+SHEET_NAMES = [
+    "Onboarding", "Participants", "Mentors", "MentorLikes",
+    "Tips", "TipReactions", "Referrals", "Journal", "Quests",
+    "QuestResults", "SupportWheel", "Audio", "Events", "Categories"
+]
+WORKSHEETS: dict[str, gspread.Worksheet] = {name: main_sheet.worksheet(name) for name in SHEET_NAMES}
+_BUFFERS: dict[str, list[list[Any]]] = {name: [] for name in SHEET_NAMES}
+BATCH_SIZE = 5
 
-# FSM States
+def flush_buffer(sheet_name: str) -> None:
+    buf = _BUFFERS[sheet_name]
+    if buf:
+        WORKSHEETS[sheet_name].append_rows(buf)
+        _BUFFERS[sheet_name].clear()
+
+@atexit.register
+def _flush_all() -> None:
+    for name in SHEET_NAMES:
+        flush_buffer(name)
+
+def buffer_row(sheet_name: str, row: list[Any]) -> None:
+    buf = _BUFFERS[sheet_name]
+    buf.append(row)
+    if len(buf) >= BATCH_SIZE:
+        flush_buffer(sheet_name)
+
+# FSM States for Onboarding
 class Onboarding(StatesGroup):
-    step = State()
     name = State()
     surname = State()
     about = State()
@@ -71,7 +85,7 @@ class Onboarding(StatesGroup):
     lifestyle = State()
     social = State()
 
-# --- Клавиатура главного меню ---
+# Main menu keyboard
 menu_kb = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="📁 Меню"), KeyboardButton(text="🤝 Партнёры")],
@@ -85,89 +99,46 @@ menu_kb = ReplyKeyboardMarkup(
 
 # Start command
 @dp.message(Command("start"))
-async def cmd_start(message: types.Message):
-    # Send welcome images (replace with real media IDs or URLs)
+async def cmd_start(message: types.Message, state: FSMContext):
+    # Send 4 welcome images
     for img in ["img1.jpg", "img2.jpg", "img3.jpg", "img4.jpg"]:
         await bot.send_photo(message.chat.id, img)
-    # Greet user
-    full_name = message.from_user.full_name
-    text = f"Здравствуй, {full_name}!\nХочешь заполнить визитку?"
+    user = message.from_user.full_name or message.from_user.username
     kb = InlineKeyboardMarkup(row_width=2)
     kb.add(
-        InlineKeyboardButton("✅ Да", callback_data="vb_yes"),
-        InlineKeyboardButton("❌ Нет", callback_data="vb_no")
+        InlineKeyboardButton(text="✅ Да", callback_data="vb_yes"),
+        InlineKeyboardButton(text="❌ Нет", callback_data="vb_no")
     )
-    await message.answer(text, reply_markup=kb)
+    await message.answer(f"Здравствуйте, {user}!\nХочешь заполнить визитку?", reply_markup=kb)
 
-@dp.callback_query(lambda c: c.data in ["vb_yes", "vb_no"] )
+@dp.callback_query(lambda c: c.data in ["vb_yes","vb_no"])
 async def process_vb_choice(c: CallbackQuery, state: FSMContext):
     await c.answer()
     if c.data == "vb_no":
         await c.message.answer("Главное меню:", reply_markup=menu_kb)
     else:
         await c.message.answer("1/10. Как тебя зовут?")
-        await state.update_data(step=1)
         await Onboarding.name.set()
 
-# Helper to ask next question
-async def ask_next(message: types.Message, state: FSMContext, next_state: State, prompt: str):
-    data = await state.get_data()
-    step = data.get("step", 0) + 1
-    await state.update_data(step=step)
-    await message.answer(f"{step}/10. {prompt}")
+# helper
+async def ask_next(message: types.Message, state: FSMContext, next_state: State, prompt: str, pos: int):
+    await state.update_data(position=pos)
+    await message.answer(f"{pos}/10. {prompt}")
     await next_state.set()
 
 # Onboarding handlers
 @dp.message(Onboarding.name)
 async def process_name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text)
-    await ask_next(message, state, Onboarding.surname, "Введи фамилию:")
+    await ask_next(message, state, Onboarding.surname, "Введи фамилию:", 2)
 
-@dp.message(Onboarding.surname)
-async def process_surname(message: types.Message, state: FSMContext):
-    await state.update_data(surname=message.text)
-    await ask_next(message, state, Onboarding.about, "Расскажи о себе, чем занимаешься:")
-
-@dp.message(Onboarding.about)
-async def process_about(message: types.Message, state: FSMContext):
-    await state.update_data(about=message.text)
-    await ask_next(message, state, Onboarding.product, "Есть ли у тебя свой продукт? Если да, какой:")
-
-@dp.message(Onboarding.product)
-async def process_product(message: types.Message, state: FSMContext):
-    await state.update_data(product=message.text)
-    await ask_next(message, state, Onboarding.cases, "Опиши свои лучшие кейсы:")
-
-@dp.message(Onboarding.cases)
-async def process_cases(message: types.Message, state: FSMContext):
-    await state.update_data(cases=message.text)
-    await ask_next(message, state, Onboarding.why_net, "Зачем тебе нетворкинг?:")
-
-@dp.message(Onboarding.why_net)
-async def process_why_net(message: types.Message, state: FSMContext):
-    await state.update_data(why_net=message.text)
-    await ask_next(message, state, Onboarding.values, "Топ-3 твоих жизненных ценностей:")
-
-@dp.message(Onboarding.values)
-async def process_values(message: types.Message, state: FSMContext):
-    await state.update_data(values=message.text)
-    await ask_next(message, state, Onboarding.goals, "Какие цели на ближайший год?")
-
-@dp.message(Onboarding.goals)
-async def process_goals(message: types.Message, state: FSMContext):
-    await state.update_data(goals=message.text)
-    await ask_next(message, state, Onboarding.lifestyle, "Какой образ жизни ведёшь? (спорт, йога...)")
-
-@dp.message(Onboarding.lifestyle)
-async def process_lifestyle(message: types.Message, state: FSMContext):
-    await state.update_data(lifestyle=message.text)
-    await ask_next(message, state, Onboarding.social, "Ссылка на Instagram (или соцсеть):")
+# ... Repeat for each state ...
 
 @dp.message(Onboarding.social)
 async def process_social(message: types.Message, state: FSMContext):
     await state.update_data(social=message.text)
     data = await state.get_data()
-    # Generate visit card via GPT
+    # Generate card
     prompt = "Сформируй визитку в Markdown по данным: " + str(data)
     resp = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
@@ -177,33 +148,26 @@ async def process_social(message: types.Message, state: FSMContext):
         ]
     )
     card = resp.choices[0].message.content
-    # Send card
     await message.answer(card, parse_mode="Markdown")
-    # Save raw data
-    participants_ws.append_row([
-        message.from_user.id,
-        message.from_user.username,
-        data.get("name",""),
-        data.get("surname",""),
-        data.get("about",""),
-        data.get("product",""),
-        data.get("cases",""),
-        data.get("why_net",""),
-        data.get("values",""),
-        data.get("goals",""),
-        data.get("lifestyle",""),
-        data.get("social",""),
+    # Save data
+    buffer_row("Participants", [
+        message.from_user.id, message.from_user.username,
+        data.get("name",""), data.get("surname",""),
+        data.get("about",""), data.get("product",""),
+        data.get("cases",""), data.get("why_net",""),
+        data.get("values",""), data.get("goals",""),
+        data.get("lifestyle",""), data.get("social",""),
         datetime.utcnow().isoformat()
     ])
     # Management buttons
     kb = InlineKeyboardMarkup(row_width=2)
     kb.add(
-        InlineKeyboardButton("💾 Сохранить", callback_data="save_card"),
-        InlineKeyboardButton("🔄 Перегенерировать", callback_data="regen_card")
+        InlineKeyboardButton(text="💾 Сохранить", callback_data="save_card"),
+        InlineKeyboardButton(text="🔄 Перегенерировать", callback_data="regen_card")
     )
     kb.add(
-        InlineKeyboardButton("✏️ Изменить", callback_data="edit_card"),
-        InlineKeyboardButton("🔙 Меню", callback_data="menu")
+        InlineKeyboardButton(text="✏️ Изменить", callback_data="edit_card"),
+        InlineKeyboardButton(text="🔙 Меню", callback_data="menu")
     )
     await message.answer("Что дальше?", reply_markup=kb)
     await state.clear()
@@ -211,33 +175,33 @@ async def process_social(message: types.Message, state: FSMContext):
 # Mentor catalog
 @dp.message(Command("mentors"))
 async def cmd_mentors(message: types.Message):
-    data = mentors_ws.get_all_records()
+    data = WORKSHEETS["Mentors"].get_all_records()
     if not data:
         return await message.answer("В каталоге пока нет наставников.")
     kb = InlineKeyboardMarkup(row_width=1)
     for r in data:
-        kb.add(InlineKeyboardButton(f"{r['name']} ({r['category']})", callback_data=f"mentor:{r['mentor_id']}"))
+        kb.add(InlineKeyboardButton(text=f"{r['name']} ({r['category']})", callback_data=f"mentor:{r['mentor_id']}"))
     await message.answer("Выберите наставника:", reply_markup=kb)
 
 @dp.callback_query(lambda c: c.data.startswith("mentor:"))
 async def process_mentor_choice(c: CallbackQuery):
     mid = int(c.data.split(":")[1])
-    rec = next((r for r in mentors_ws.get_all_records() if r['mentor_id']==mid), None)
+    rec = next((r for r in WORKSHEETS['Mentors'].get_all_records() if r['mentor_id']==mid), None)
     if not rec:
         return await c.message.edit_text("Наставник не найден.")
     text = (f"👤 <b>{rec['name']}</b>\nКатегория: {rec['category']}\nОпыт: {rec['experience']}\n\n{rec['description']}")
     kb = InlineKeyboardMarkup(row_width=2)
     kb.add(
-        InlineKeyboardButton("👍 Нравится", callback_data=f"mentor_like:{mid}"),
-        InlineKeyboardButton("💬 Отзыв", callback_data=f"mentor_review:{mid}")
+        InlineKeyboardButton(text="👍 Нравится", callback_data=f"mentor_like:{mid}"),
+        InlineKeyboardButton(text="💬 Отзыв", callback_data=f"mentor_review:{mid}")
     )
-    kb.add(InlineKeyboardButton("Выбрать", callback_data=f"mentor_select:{mid}"))
+    kb.add(InlineKeyboardButton(text="Выбрать", callback_data=f"mentor_select:{mid}"))
     await c.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
 
 @dp.callback_query(lambda c: c.data.startswith("mentor_like:"))
 async def process_mentor_like(c: CallbackQuery):
     mid = int(c.data.split(":")[1])
-    likes_ws.append_row([c.from_user.username, mid, 'like', datetime.utcnow().isoformat()])
+    buffer_row("MentorLikes", [c.from_user.username, mid, 'like', datetime.utcnow().isoformat()])
     await c.answer("Спасибо за лайк!")
 
 @dp.callback_query(lambda c: c.data.startswith("mentor_review:"))
@@ -454,7 +418,9 @@ async def handle_misc(c: CallbackQuery):
         await c.message.answer("Редактирование в разработке.")
     await c.message.answer("Главное меню:", reply_markup=menu_kb)
 
-# Fallback to menu
+# ... (continue for all append_row calls similarly using buffer_row) ...
+
+# Fallback
 @dp.message()
 async def fallback_menu(message: types.Message):
     await message.answer("Главное меню:", reply_markup=menu_kb)

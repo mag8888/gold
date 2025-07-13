@@ -7,7 +7,7 @@ from typing import Any
 
 from aiogram import Bot, Dispatcher, types, filters
 from aiogram.filters import Command
-from aiogram.filters import ContentTypeFilter
+from aiogram.filters.content_type import ContentTypeFilter
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton,
     InlineKeyboardMarkup, InlineKeyboardButton, ContentType,

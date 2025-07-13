@@ -1,17 +1,15 @@
 import os
 import logging
-import requests
-import pytz
 from datetime import datetime
 from typing import Optional, Dict, List
-
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters.command import Command
-from aiogram.filters import ContentTypeFilter
+from aiogram.filters import Command
 from aiogram.types import (
-    InlineKeyboardButton, InlineKeyboardMarkup,
-    ReplyKeyboardMarkup, KeyboardButton,
-    ContentType, CallbackQuery
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    CallbackQuery
 )
 
 # ===== CONFIGURATION =====

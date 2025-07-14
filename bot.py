@@ -230,11 +230,17 @@ def get_habits_list_keyboard(habits):
         
         # Формируем отображение с молнией и галочкой в разные стороны
         if habit['is_active']:
-            # Симметричное форматирование с пробелами
-            text = f"{target_frequency} ⚡ {habit['habit_name']} ✅ {completed_today}"
+            # Центрированное форматирование с равномерными пробелами
+            habit_name = habit['habit_name']
+            # Добавляем пробелы для центрирования
+            spaces_before = " " * max(0, (20 - len(habit_name)) // 2)
+            spaces_after = " " * max(0, 20 - len(habit_name) - len(spaces_before))
+            text = f"{target_frequency} ⚡{spaces_before}{habit_name}{spaces_after}✅ {completed_today}"
             status_emoji = "🟢" if completed_today >= target_frequency else "🟡"
         else:
-            text = f"⏸️ {habit['habit_name']}"
+            habit_name = habit['habit_name']
+            spaces = " " * max(0, (25 - len(habit_name)) // 2)
+            text = f"⏸️{spaces}{habit_name}{spaces}"
             status_emoji = "⏸️"
         button = InlineKeyboardButton(
             text=text,
@@ -2321,15 +2327,15 @@ async def test_reminders_command(message: types.Message):
     habit_id = test_habit['habit_id']
     habit_name = test_habit['habit_name']
     
-    # Запускаем напоминания
-    await start_habit_reminders(bot, db, user_id, habit_id)
+    # ОТКЛЮЧЕНО: Старая система напоминаний
+    # await start_habit_reminders(bot, db, user_id, habit_id)
     
     await message.answer(
-        f"🔔 **Тестирование напоминаний запущено!**\n\n"
+        f"🔔 **Система напоминаний обновлена!**\n\n"
         f"📅 Привычка: {habit_name}\n"
-        f"⏰ Напоминания согласно вашим настройкам\n"
-        f"✅ Остановятся после выполнения привычки\n\n"
-        f"Используйте /stop_test_reminders для остановки.",
+        f"⏰ Теперь используется новая система hourly push\n"
+        f"✅ 1 сводное уведомление каждый час\n\n"
+        f"Старые индивидуальные напоминания отключены.",
         parse_mode="Markdown"
     )
 
@@ -2467,8 +2473,8 @@ async def main():
         # Создаем таблицу настроек напоминаний
         db.create_reminder_settings_table()
         
-        # Запускаем ежедневную проверку напоминаний
-        asyncio.create_task(start_daily_reminder_check(bot, db))
+        # ОТКЛЮЧЕНО: Старая система напоминаний (заменена на hourly push)
+        # asyncio.create_task(start_daily_reminder_check(bot, db))
         
         # Запускаем систему почасовых push-уведомлений
         hourly_push = HourlyPushSystem(bot)
@@ -2544,6 +2550,7 @@ async def settings_callback(callback: types.CallbackQuery):
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="⚙️ Настройки напоминаний", callback_data="reminder_settings")],
+            [InlineKeyboardButton(text="🕐 Настройки времени", callback_data="timezone_settings")],
             [InlineKeyboardButton(text="🔔 Уведомления", callback_data="notification_settings")],
             [InlineKeyboardButton(text="🌍 Язык", callback_data="language_settings")],
             [InlineKeyboardButton(text="🔙 Назад", callback_data="close_settings")]
@@ -2586,4 +2593,273 @@ async def language_settings_callback(callback: types.CallbackQuery):
         )
     )
     await callback.answer()
+
+
+@dp.callback_query(F.data == "timezone_settings")
+async def timezone_settings_callback(callback: types.CallbackQuery):
+    """Настройки часового пояса и времени push-уведомлений"""
+    user_id = callback.from_user.id
+    settings = db.get_user_timezone_settings(user_id)
+    
+    status_text = "✅ Включены" if settings['push_enabled'] else "❌ Отключены"
+    
+    text = f"🕐 **Настройки времени и push-уведомлений**\n\n" \
+           f"🌍 Часовой пояс: **{settings['timezone']}**\n" \
+           f"🌅 Начало push: **{settings['push_start_hour']:02d}:00**\n" \
+           f"🌙 Конец push: **{settings['push_end_hour']:02d}:00**\n" \
+           f"📱 Push-уведомления: **{status_text}**\n\n" \
+           f"*Push-уведомления отправляются каждый час в указанное время только по незавершенным привычкам*"
+    
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🌍 Изменить часовой пояс", callback_data="change_timezone")],
+            [InlineKeyboardButton(text="🌅 Время начала", callback_data="change_start_hour")],
+            [InlineKeyboardButton(text="🌙 Время окончания", callback_data="change_end_hour")],
+            [InlineKeyboardButton(
+                text="✅ Включить push" if not settings['push_enabled'] else "❌ Отключить push", 
+                callback_data="toggle_push"
+            )],
+            [InlineKeyboardButton(text="🔙 Назад", callback_data="settings")]
+        ]
+    )
+    
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
+    await callback.answer()
+
+@dp.callback_query(F.data == "change_timezone")
+async def change_timezone_callback(callback: types.CallbackQuery):
+    """Изменение часового пояса"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🇷🇺 Москва (UTC+3)", callback_data="set_timezone_Europe/Moscow")],
+            [InlineKeyboardButton(text="🇺🇦 Киев (UTC+2)", callback_data="set_timezone_Europe/Kiev")],
+            [InlineKeyboardButton(text="🇰🇿 Алматы (UTC+6)", callback_data="set_timezone_Asia/Almaty")],
+            [InlineKeyboardButton(text="🇺🇸 Нью-Йорк (UTC-5)", callback_data="set_timezone_America/New_York")],
+            [InlineKeyboardButton(text="🇬🇧 Лондон (UTC+0)", callback_data="set_timezone_Europe/London")],
+            [InlineKeyboardButton(text="🌍 UTC (UTC+0)", callback_data="set_timezone_UTC")],
+            [InlineKeyboardButton(text="🔙 Назад", callback_data="timezone_settings")]
+        ]
+    )
+    
+    await callback.message.edit_text(
+        "🌍 **Выберите ваш часовой пояс:**\n\n"
+        "*Это поможет отправлять push-уведомления в правильное время*",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("set_timezone_"))
+async def set_timezone_callback(callback: types.CallbackQuery):
+    """Установка часового пояса"""
+    timezone = callback.data.replace("set_timezone_", "")
+    user_id = callback.from_user.id
+    
+    success = db.update_user_timezone_settings(user_id, timezone=timezone)
+    
+    if success:
+        timezone_names = {
+            "Europe/Moscow": "🇷🇺 Москва (UTC+3)",
+            "Europe/Kiev": "🇺🇦 Киев (UTC+2)", 
+            "Asia/Almaty": "🇰🇿 Алматы (UTC+6)",
+            "America/New_York": "🇺🇸 Нью-Йорк (UTC-5)",
+            "Europe/London": "🇬🇧 Лондон (UTC+0)",
+            "UTC": "🌍 UTC (UTC+0)"
+        }
+        
+        await callback.answer(f"✅ Часовой пояс изменен на {timezone_names.get(timezone, timezone)}")
+        await timezone_settings_callback(callback)
+    else:
+        await callback.answer("❌ Ошибка при сохранении")
+
+@dp.callback_query(F.data == "change_start_hour")
+async def change_start_hour_callback(callback: types.CallbackQuery):
+    """Изменение времени начала push-уведомлений"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="06:00", callback_data="set_start_hour_6"),
+                InlineKeyboardButton(text="07:00", callback_data="set_start_hour_7"),
+                InlineKeyboardButton(text="08:00", callback_data="set_start_hour_8")
+            ],
+            [
+                InlineKeyboardButton(text="09:00", callback_data="set_start_hour_9"),
+                InlineKeyboardButton(text="10:00", callback_data="set_start_hour_10"),
+                InlineKeyboardButton(text="11:00", callback_data="set_start_hour_11")
+            ],
+            [InlineKeyboardButton(text="🔙 Назад", callback_data="timezone_settings")]
+        ]
+    )
+    
+    await callback.message.edit_text(
+        "🌅 **Выберите время начала push-уведомлений:**\n\n"
+        "*С этого времени бот будет отправлять напоминания о незавершенных привычках*",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("set_start_hour_"))
+async def set_start_hour_callback(callback: types.CallbackQuery):
+    """Установка времени начала push-уведомлений"""
+    hour = int(callback.data.split("_")[3])
+    user_id = callback.from_user.id
+    
+    success = db.update_user_timezone_settings(user_id, push_start_hour=hour)
+    
+    if success:
+        await callback.answer(f"✅ Время начала изменено на {hour:02d}:00")
+        await timezone_settings_callback(callback)
+    else:
+        await callback.answer("❌ Ошибка при сохранении")
+
+@dp.callback_query(F.data == "change_end_hour")
+async def change_end_hour_callback(callback: types.CallbackQuery):
+    """Изменение времени окончания push-уведомлений"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="20:00", callback_data="set_end_hour_20"),
+                InlineKeyboardButton(text="21:00", callback_data="set_end_hour_21"),
+                InlineKeyboardButton(text="22:00", callback_data="set_end_hour_22")
+            ],
+            [
+                InlineKeyboardButton(text="23:00", callback_data="set_end_hour_23"),
+                InlineKeyboardButton(text="00:00", callback_data="set_end_hour_0"),
+                InlineKeyboardButton(text="01:00", callback_data="set_end_hour_1")
+            ],
+            [InlineKeyboardButton(text="🔙 Назад", callback_data="timezone_settings")]
+        ]
+    )
+    
+    await callback.message.edit_text(
+        "🌙 **Выберите время окончания push-уведомлений:**\n\n"
+        "*После этого времени бот прекратит отправлять напоминания до следующего дня*",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("set_end_hour_"))
+async def set_end_hour_callback(callback: types.CallbackQuery):
+    """Установка времени окончания push-уведомлений"""
+    hour = int(callback.data.split("_")[3])
+    user_id = callback.from_user.id
+    
+    success = db.update_user_timezone_settings(user_id, push_end_hour=hour)
+    
+    if success:
+        await callback.answer(f"✅ Время окончания изменено на {hour:02d}:00")
+        await timezone_settings_callback(callback)
+    else:
+        await callback.answer("❌ Ошибка при сохранении")
+
+@dp.callback_query(F.data == "toggle_push")
+async def toggle_push_callback(callback: types.CallbackQuery):
+    """Включение/отключение push-уведомлений"""
+    user_id = callback.from_user.id
+    settings = db.get_user_timezone_settings(user_id)
+    
+    new_status = not settings['push_enabled']
+    success = db.update_user_timezone_settings(user_id, push_enabled=new_status)
+    
+    if success:
+        status_text = "включены" if new_status else "отключены"
+        await callback.answer(f"✅ Push-уведомления {status_text}")
+        await timezone_settings_callback(callback)
+    else:
+        await callback.answer("❌ Ошибка при сохранении")
+
+
+@dp.callback_query(F.data.startswith("quick_habit_"))
+async def quick_habit_complete(callback: types.CallbackQuery):
+    """Быстрое отмечание выполнения привычки из push-уведомления"""
+    try:
+        habit_id = int(callback.data.split("_")[2])
+        user_id = callback.from_user.id
+        
+        # Получаем информацию о привычке
+        habit = db.get_habit_by_id(habit_id)
+        if not habit or habit['user_id'] != user_id:
+            await callback.answer("❌ Привычка не найдена")
+            return
+        
+        # Отмечаем выполнение
+        success = db.log_habit_completion(habit_id, user_id, completed=True)
+        
+        if success:
+            habit_name = habit['habit_name']
+            
+            # Проверяем, выполнены ли теперь все привычки
+            incomplete_habits = []
+            user_habits = db.get_user_habits(user_id)
+            
+            for h in user_habits:
+                h_id = h['habit_id']
+                target_count = h.get('target_frequency', 1)
+                current_count = db.get_habit_progress_today(user_id, h_id)
+                
+                if current_count < target_count:
+                    incomplete_habits.append({
+                        'id': h_id,
+                        'name': h['habit_name'],
+                        'current': current_count,
+                        'target': target_count,
+                        'remaining': target_count - current_count
+                    })
+            
+            # Обновляем сообщение
+            if incomplete_habits:
+                # Есть еще незавершенные привычки
+                message = "⏰ **Напоминание о привычках**\n\n"
+                message += f"✅ **{habit_name}** - выполнено!\n\n"
+                message += "Незавершенные цели на сегодня:\n\n"
+                
+                # Создаем новые кнопки для оставшихся привычек
+                keyboard_buttons = []
+                
+                for h in incomplete_habits:
+                    message += f"🔴 **{h['name']}**\n"
+                    message += f"   Осталось: {h['remaining']} из {h['target']}\n"
+                    message += f"   Выполнено: {h['current']}/{h['target']}\n\n"
+                    
+                    button_text = f"✅ {h['name']}"
+                    callback_data = f"quick_habit_{h['id']}"
+                    
+                    keyboard_buttons.append([
+                        InlineKeyboardButton(text=button_text, callback_data=callback_data)
+                    ])
+                
+                message += "💪 Продолжайте! Каждый шаг приближает к цели!\n\n"
+                message += "*Нажмите кнопку для быстрого отмечания выполнения*"
+                
+                keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+                
+                await callback.message.edit_text(
+                    text=message,
+                    parse_mode="Markdown",
+                    reply_markup=keyboard
+                )
+            else:
+                # Все привычки выполнены!
+                message = "🎉 **Поздравляем!**\n\n"
+                message += f"✅ **{habit_name}** - выполнено!\n\n"
+                message += "🏆 **Все привычки на сегодня выполнены!**\n\n"
+                message += "💪 Отличная работа! Увидимся завтра!"
+                
+                await callback.message.edit_text(
+                    text=message,
+                    parse_mode="Markdown",
+                    reply_markup=None
+                )
+            
+            await callback.answer(f"✅ {habit_name} отмечена как выполненная!")
+            
+        else:
+            await callback.answer("❌ Ошибка при сохранении")
+            
+    except Exception as e:
+        logger.error(f"Error in quick_habit_complete: {e}")
+        await callback.answer("❌ Произошла ошибка")
+
 

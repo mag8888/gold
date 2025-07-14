@@ -7,6 +7,7 @@ import asyncio
 import logging
 from datetime import datetime, time
 from typing import List, Dict, Any
+import pytz
 from aiogram import Bot
 from database import Database
 
@@ -18,10 +19,6 @@ class HourlyPushSystem:
         self.db = Database()
         self.is_running = False
         self.push_task = None
-        
-        # Настройки дневного времени (можно настроить)
-        self.day_start_hour = 8   # 08:00
-        self.day_end_hour = 22    # 22:00
     
     def start(self):
         """Запуск системы почасовых push-уведомлений"""
@@ -39,15 +36,38 @@ class HourlyPushSystem:
             self.push_task.cancel()
         logger.info("Hourly push system stopped")
     
+    def _get_user_local_time(self, timezone_str: str) -> datetime:
+        """Получение локального времени пользователя"""
+        try:
+            user_tz = pytz.timezone(timezone_str)
+            utc_now = datetime.now(pytz.UTC)
+            return utc_now.astimezone(user_tz)
+        except:
+            # Если часовой пояс некорректный, используем UTC
+            return datetime.now(pytz.UTC)
+    
+    def _is_in_push_time(self, user_settings: Dict) -> bool:
+        """Проверка, находится ли пользователь в своем дневном времени"""
+        if not user_settings['push_enabled']:
+            return False
+        
+        local_time = self._get_user_local_time(user_settings['timezone'])
+        current_hour = local_time.hour
+        
+        start_hour = user_settings['push_start_hour']
+        end_hour = user_settings['push_end_hour']
+        
+        # Обработка случая когда время переходит через полночь
+        if start_hour <= end_hour:
+            return start_hour <= current_hour < end_hour
+        else:
+            return current_hour >= start_hour or current_hour < end_hour
+    
     async def _hourly_push_loop(self):
         """Основной цикл почасовых уведомлений"""
         while self.is_running:
             try:
-                current_hour = datetime.now().hour
-                
-                # Проверяем, находимся ли в дневном времени
-                if self.day_start_hour <= current_hour < self.day_end_hour:
-                    await self._send_hourly_push_notifications()
+                await self._send_hourly_push_notifications()
                 
                 # Ждем до следующего часа
                 await self._wait_until_next_hour()
@@ -69,12 +89,22 @@ class HourlyPushSystem:
         """Отправка почасовых push-уведомлений"""
         logger.info("Starting hourly push notifications")
         
-        # Получаем всех пользователей с активными привычками
-        users_with_habits = self.db.get_users_with_active_habits()
+        # Получаем всех пользователей с их настройками часового пояса
+        users_with_settings = self.db.get_all_users_with_timezone_settings()
         
         sent_count = 0
-        for user_id in users_with_habits:
+        for user_data in users_with_settings:
             try:
+                user_id = user_data['user_id']
+                
+                # Проверяем, находится ли пользователь в своем дневном времени
+                if not self._is_in_push_time(user_data):
+                    continue
+                
+                # Проверяем, есть ли у пользователя активные привычки
+                if not self.db.get_user_habits(user_id):
+                    continue
+                
                 # Проверяем статус пользователя на сегодня
                 if self._is_user_goals_completed(user_id):
                     logger.info(f"User {user_id} has completed all goals, skipping")
@@ -157,32 +187,51 @@ class HourlyPushSystem:
             return []
     
     async def _send_push_notification(self, user_id: int, incomplete_habits: List[Dict[str, Any]]):
-        """Отправка push-уведомления о незавершенных привычках"""
+        """Отправка push-уведомления о незавершенных привычках с кнопками"""
         try:
+            from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+            
             # Формируем сообщение
             message = "⏰ **Напоминание о привычках**\n\n"
             message += "Незавершенные цели на сегодня:\n\n"
+            
+            # Создаем кнопки для каждой привычки
+            keyboard_buttons = []
             
             for habit in incomplete_habits:
                 remaining = habit['remaining']
                 name = habit['name']
                 current = habit['current']
                 target = habit['target']
+                habit_id = habit['id']
                 
                 message += f"🔴 **{name}**\n"
                 message += f"   Осталось: {remaining} из {target}\n"
                 message += f"   Выполнено: {current}/{target}\n\n"
+                
+                # Добавляем кнопку для быстрого отмечания
+                button_text = f"✅ {name}"
+                callback_data = f"quick_habit_{habit_id}"
+                
+                keyboard_buttons.append([
+                    InlineKeyboardButton(text=button_text, callback_data=callback_data)
+                ])
             
-            message += "💪 Продолжайте! Каждый шаг приближает к цели!"
+            message += "💪 Продолжайте! Каждый шаг приближает к цели!\n\n"
+            message += "*Нажмите кнопку для быстрого отмечания выполнения*"
             
-            # Отправляем уведомление
+            # Создаем клавиатуру
+            keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+            
+            # Отправляем уведомление с кнопками
             await self.bot.send_message(
                 chat_id=user_id,
                 text=message,
-                parse_mode="Markdown"
+                parse_mode="Markdown",
+                reply_markup=keyboard
             )
             
-            logger.info(f"Sent push notification to user {user_id}")
+            logger.info(f"Sent push notification with buttons to user {user_id}")
             
         except Exception as e:
             logger.error(f"Error sending push notification to user {user_id}: {e}")

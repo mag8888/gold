@@ -587,6 +587,103 @@ class Database:
             logger.error(f"Error getting habit progress: {e}")
             return 0
 
+    def get_user_timezone_settings(self, user_id: int) -> dict:
+        """Получение настроек часового пояса и времени push-уведомлений пользователя"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT timezone, push_start_hour, push_end_hour, push_enabled
+                    FROM users 
+                    WHERE user_id = ?
+                ''', (user_id,))
+                
+                result = cursor.fetchone()
+                if result:
+                    return {
+                        'timezone': result[0] or 'UTC',
+                        'push_start_hour': result[1] or 8,
+                        'push_end_hour': result[2] or 22,
+                        'push_enabled': bool(result[3]) if result[3] is not None else True
+                    }
+                else:
+                    # Возвращаем настройки по умолчанию
+                    return {
+                        'timezone': 'UTC',
+                        'push_start_hour': 8,
+                        'push_end_hour': 22,
+                        'push_enabled': True
+                    }
+        except Exception as e:
+            print(f"Error getting user timezone settings: {e}")
+            return {
+                'timezone': 'UTC',
+                'push_start_hour': 8,
+                'push_end_hour': 22,
+                'push_enabled': True
+            }
+
+    def update_user_timezone_settings(self, user_id: int, timezone: str = None, 
+                                    push_start_hour: int = None, push_end_hour: int = None, 
+                                    push_enabled: bool = None) -> bool:
+        """Обновление настроек часового пояса и времени push-уведомлений"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                updates = []
+                params = []
+                
+                if timezone is not None:
+                    updates.append('timezone = ?')
+                    params.append(timezone)
+                if push_start_hour is not None:
+                    updates.append('push_start_hour = ?')
+                    params.append(push_start_hour)
+                if push_end_hour is not None:
+                    updates.append('push_end_hour = ?')
+                    params.append(push_end_hour)
+                if push_enabled is not None:
+                    updates.append('push_enabled = ?')
+                    params.append(push_enabled)
+                
+                if updates:
+                    params.append(user_id)
+                    query = f'UPDATE users SET {", ".join(updates)} WHERE user_id = ?'
+                    cursor.execute(query, params)
+                    conn.commit()
+                    return True
+                return False
+        except Exception as e:
+            print(f"Error updating user timezone settings: {e}")
+            return False
+
+    def get_all_users_with_timezone_settings(self) -> List[Dict]:
+        """Получение всех пользователей с их настройками часового пояса"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT user_id, first_name, timezone, push_start_hour, push_end_hour, push_enabled
+                    FROM users 
+                    WHERE status = 'active'
+                ''')
+                
+                results = cursor.fetchall()
+                users = []
+                for row in results:
+                    users.append({
+                        'user_id': row[0],
+                        'first_name': row[1],
+                        'timezone': row[2] or 'UTC',
+                        'push_start_hour': row[3] or 8,
+                        'push_end_hour': row[4] or 22,
+                        'push_enabled': bool(row[5]) if row[5] is not None else True
+                    })
+                return users
+        except Exception as e:
+            print(f"Error getting users with timezone settings: {e}")
+            return []
+
 # Создаем глобальный экземпляр базы данных для обратной совместимости
 db = Database()
-

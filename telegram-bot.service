@@ -1,0 +1,18 @@
+[Unit]
+Description=AlteriA Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/gold
+EnvironmentFile=/home/ubuntu/gold/.env
+ExecStart=/home/ubuntu/gold/venv/bin/python /home/ubuntu/gold/bot.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+

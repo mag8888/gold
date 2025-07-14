@@ -17,6 +17,7 @@ from database import Database
 from openai_service import OpenAIService
 from scheduler import ReportScheduler
 from reminder_system import start_habit_reminders, stop_habit_reminders, start_daily_reminder_check, active_reminders
+from hourly_push_system import HourlyPushSystem
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -2469,7 +2470,11 @@ async def main():
         # Запускаем ежедневную проверку напоминаний
         asyncio.create_task(start_daily_reminder_check(bot, db))
         
-        logger.info("Starting bot...")
+        # Запускаем систему почасовых push-уведомлений
+        hourly_push = HourlyPushSystem(bot)
+        hourly_push.start()
+        
+        logger.info("Starting bot with hourly push notifications...")
         await dp.start_polling(bot)
     except Exception as e:
         logger.error(f"Error starting bot: {e}")

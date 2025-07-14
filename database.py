@@ -247,15 +247,32 @@ class Database:
                 result = cursor.fetchone()
                 referral_code = result[0] if result else f"ref_{user_id}"
                 
-                # Считаем количество рефералов
+                # Считаем количество рефералов из таблицы users (основной источник)
                 cursor.execute('''
-                    SELECT COUNT(*), COALESCE(SUM(earnings), 0)
-                    FROM referrals WHERE referrer_user_id = ?
+                    SELECT COUNT(*) FROM users WHERE referrer_id = ?
                 ''', (user_id,))
                 
-                count_result = cursor.fetchone()
-                referral_count = count_result[0] if count_result else 0
-                total_earnings = count_result[1] if count_result else 0.0
+                users_result = cursor.fetchone()
+                users_count = users_result[0] if users_result else 0
+                
+                # Считаем заработок из таблицы referrals
+                cursor.execute('''
+                    SELECT COALESCE(SUM(earnings), 0) FROM referrals WHERE referrer_user_id = ?
+                ''', (user_id,))
+                
+                earnings_result = cursor.fetchone()
+                total_earnings = earnings_result[0] if earnings_result else 0.0
+                
+                # Также проверяем количество в таблице referrals для сравнения
+                cursor.execute('''
+                    SELECT COUNT(*) FROM referrals WHERE referrer_user_id = ?
+                ''', (user_id,))
+                
+                referrals_result = cursor.fetchone()
+                referrals_count = referrals_result[0] if referrals_result else 0
+                
+                # Используем максимальное значение из двух таблиц
+                referral_count = max(users_count, referrals_count)
                 
                 return {
                     'referral_code': referral_code,
@@ -534,5 +551,42 @@ class Database:
             print(f"Error getting setting {key}: {e}")
             return None
 
+    def get_users_with_active_habits(self) -> List[int]:
+        """Получение списка пользователей с активными привычками"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT DISTINCT user_id 
+                FROM habits 
+                WHERE is_active = TRUE
+            ''')
+            
+            result = cursor.fetchall()
+            return [row[0] for row in result]
+            
+        except Exception as e:
+            logger.error(f"Error getting users with active habits: {e}")
+            return []
+    
+    def get_habit_progress_today(self, user_id: int, habit_id: int) -> int:
+        """Получение прогресса привычки на сегодня"""
+        try:
+            cursor = self.conn.cursor()
+            today = datetime.now().date()
+            
+            cursor.execute('''
+                SELECT COUNT(*) 
+                FROM habit_logs 
+                WHERE user_id = ? AND habit_id = ? AND completion_date = ?
+            ''', (user_id, habit_id, today))
+            
+            result = cursor.fetchone()
+            return result[0] if result else 0
+            
+        except Exception as e:
+            logger.error(f"Error getting habit progress: {e}")
+            return 0
+
 # Создаем глобальный экземпляр базы данных для обратной совместимости
 db = Database()
+

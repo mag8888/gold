@@ -484,15 +484,7 @@ async def admin_broadcast(callback: types.CallbackQuery, state: FSMContext):
         reply_markup=None
     )
     await state.set_state(AdminStates.waiting_for_broadcast_message)
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.message(StateFilter(AdminStates.waiting_for_broadcast_message))
 async def process_broadcast_message(message: types.Message, state: FSMContext):
@@ -533,15 +525,7 @@ async def admin_stats(callback: types.CallbackQuery):
         reply_markup=None,
         parse_mode="Markdown"
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "yes")
 async def start_onboarding(callback: types.CallbackQuery, state: FSMContext):
@@ -550,15 +534,7 @@ async def start_onboarding(callback: types.CallbackQuery, state: FSMContext):
         "Отлично! Давайте создадим вашу визитку.\n\n1/10. Как к тебе обращаться?"
     )
     await state.set_state(OnboardingStates.waiting_for_first_name)
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "no")
 async def skip_onboarding(callback: types.CallbackQuery, state: FSMContext):
@@ -571,15 +547,7 @@ async def skip_onboarding(callback: types.CallbackQuery, state: FSMContext):
         "Добро пожаловать в AlteriA! 🎉",
         reply_markup=get_main_menu_keyboard()
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 # Обработчики онбординга
 @dp.message(StateFilter(OnboardingStates.waiting_for_first_name))
@@ -729,19 +697,7 @@ async def save_business_card(callback: types.CallbackQuery, state: FSMContext):
             reply_markup=get_main_menu_keyboard()
         )
     
-    try:
-
-    
-        await callback.answer()
-
-    
-    except Exception as e:
-
-    
-        # Игнорируем ошибки устаревших callback-запросов
-
-    
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data.startswith("category_"))
 async def select_category(callback: types.CallbackQuery, state: FSMContext):
@@ -771,15 +727,7 @@ async def select_category(callback: types.CallbackQuery, state: FSMContext):
         )
     
     await state.clear()
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "regenerate_card")
 async def regenerate_business_card(callback: types.CallbackQuery, state: FSMContext):
@@ -806,19 +754,7 @@ async def regenerate_business_card(callback: types.CallbackQuery, state: FSMCont
             reply_markup=get_card_management_keyboard()
         )
     
-    try:
-
-    
-        await callback.answer()
-
-    
-    except Exception as e:
-
-    
-        # Игнорируем ошибки устаревших callback-запросов
-
-    
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "edit_card")
 async def edit_business_card(callback: types.CallbackQuery, state: FSMContext):
@@ -828,15 +764,7 @@ async def edit_business_card(callback: types.CallbackQuery, state: FSMContext):
         reply_markup=None
     )
     await state.set_state(EditStates.waiting_for_manual_edit)
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.message(StateFilter(EditStates.waiting_for_manual_edit))
 async def process_manual_edit(message: types.Message, state: FSMContext):
@@ -864,15 +792,7 @@ async def show_main_menu(callback: types.CallbackQuery, state: FSMContext):
         reply_markup=get_main_menu_keyboard()
     )
     await state.clear()
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 # Обработчики главного меню
 @dp.message(F.text == "📁 Меню")
@@ -986,15 +906,7 @@ async def show_goals_menu_callback(callback: types.CallbackQuery):
         "🎯 Управление целями:",
         reply_markup=keyboard
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "add_goals")
 async def add_goals_start(callback: types.CallbackQuery, state: FSMContext):
@@ -1004,15 +916,7 @@ async def add_goals_start(callback: types.CallbackQuery, state: FSMContext):
         reply_markup=None
     )
     await state.set_state(GoalStates.waiting_for_goals_input)
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.message(StateFilter(GoalStates.waiting_for_goals_input))
 async def process_goals_input(message: types.Message, state: FSMContext):
@@ -1057,15 +961,7 @@ async def process_goal_type(callback: types.CallbackQuery, state: FSMContext):
     )
     
     await state.clear()
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "show_daily_goals")
 async def show_daily_goals(callback: types.CallbackQuery):
@@ -1093,19 +989,7 @@ async def show_daily_goals(callback: types.CallbackQuery):
             reply_markup=None
         )
     
-    try:
-
-    
-        await callback.answer()
-
-    
-    except Exception as e:
-
-    
-        # Игнорируем ошибки устаревших callback-запросов
-
-    
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "show_monthly_goals")
 async def show_monthly_goals(callback: types.CallbackQuery):
@@ -1132,19 +1016,7 @@ async def show_monthly_goals(callback: types.CallbackQuery):
             reply_markup=None
         )
     
-    try:
-
-    
-        await callback.answer()
-
-    
-    except Exception as e:
-
-    
-        # Игнорируем ошибки устаревших callback-запросов
-
-    
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "update_goals")
 async def update_goals_menu(callback: types.CallbackQuery):
@@ -1161,15 +1033,7 @@ async def update_goals_menu(callback: types.CallbackQuery):
         "✏️ Выберите тип целей для обновления:",
         reply_markup=keyboard
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "update_daily_goals")
 async def update_daily_goals(callback: types.CallbackQuery):
@@ -1193,19 +1057,7 @@ async def update_daily_goals(callback: types.CallbackQuery):
             reply_markup=get_goals_keyboard(goals, 'daily')
         )
     
-    try:
-
-    
-        await callback.answer()
-
-    
-    except Exception as e:
-
-    
-        # Игнорируем ошибки устаревших callback-запросов
-
-    
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "update_monthly_goals")
 async def update_monthly_goals(callback: types.CallbackQuery):
@@ -1228,19 +1080,7 @@ async def update_monthly_goals(callback: types.CallbackQuery):
             reply_markup=get_goals_keyboard(goals, 'monthly')
         )
     
-    try:
-
-    
-        await callback.answer()
-
-    
-    except Exception as e:
-
-    
-        # Игнорируем ошибки устаревших callback-запросов
-
-    
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data.startswith("update_goal_"))
 async def select_goal_for_update(callback: types.CallbackQuery):
@@ -1251,15 +1091,7 @@ async def select_goal_for_update(callback: types.CallbackQuery):
         "✏️ Выберите новый статус для цели:",
         reply_markup=get_goal_status_keyboard(goal_id)
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data.startswith("goal_complete_"))
 async def complete_goal(callback: types.CallbackQuery):
@@ -1281,19 +1113,7 @@ async def complete_goal(callback: types.CallbackQuery):
             )
         )
     
-    try:
-
-    
-        await callback.answer()
-
-    
-    except Exception as e:
-
-    
-        # Игнорируем ошибки устаревших callback-запросов
-
-    
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data.startswith("goal_progress_"))
 async def set_goal_in_progress(callback: types.CallbackQuery):
@@ -1315,19 +1135,7 @@ async def set_goal_in_progress(callback: types.CallbackQuery):
             )
         )
     
-    try:
-
-    
-        await callback.answer()
-
-    
-    except Exception as e:
-
-    
-        # Игнорируем ошибки устаревших callback-запросов
-
-    
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 # Команда для получения правильной реферальной ссылки
 @dp.message(Command("mylink"))
@@ -1439,15 +1247,7 @@ async def show_my_referrals(callback: types.CallbackQuery):
                     ]
                 )
             )
-            try:
-
-                await callback.answer()
-
-            except Exception as e:
-
-                # Игнорируем ошибки устаревших callback-запросов
-
-                logger.warning(f"Callback answer error (ignored): {e}")
+            await callback.answer()
             return
         
         text = f"👥 **Мои рефералы ({len(referrals)})**\n\n"
@@ -1486,15 +1286,7 @@ async def show_my_referrals(callback: types.CallbackQuery):
         )
         
         await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=keyboard)
-        try:
-
-            await callback.answer()
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer()
         
     except Exception as e:
         import traceback
@@ -1517,19 +1309,7 @@ async def show_my_referrals(callback: types.CallbackQuery):
         except:
             pass
         
-        try:
-
-        
-            await callback.answer("❌ Ошибка при загрузке рефералов")
-
-        
-        except Exception as e:
-
-        
-            # Игнорируем ошибки устаревших callback-запросов
-
-        
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Ошибка при загрузке рефералов")
 
 @dp.callback_query(F.data == "back_to_partners")
 async def back_to_partners(callback: types.CallbackQuery):
@@ -1566,15 +1346,7 @@ async def back_to_partners(callback: types.CallbackQuery):
 ⏰ Обновлено: {datetime.now().strftime('%H:%M:%S')}"""
     
     await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=keyboard)
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.message(F.text == "🚀 Развитие")
 async def development_handler(message: types.Message):
@@ -1626,15 +1398,7 @@ async def habits_menu_callback(callback: types.CallbackQuery):
         reply_markup=get_habits_menu_keyboard(),
         parse_mode="Markdown"
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "add_habit")
 async def add_habit_start(callback: types.CallbackQuery, state: FSMContext):
@@ -1646,15 +1410,7 @@ async def add_habit_start(callback: types.CallbackQuery, state: FSMContext):
         parse_mode="Markdown"
     )
     await state.set_state(HabitStates.waiting_for_habit_name)
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.message(StateFilter(HabitStates.waiting_for_habit_name))
 async def process_habit_name(message: types.Message, state: FSMContext):
@@ -1712,19 +1468,7 @@ async def process_habit_type(callback: types.CallbackQuery, state: FSMContext):
         )
         await state.set_state(HabitStates.waiting_for_habit_frequency)
     
-    try:
-
-    
-        await callback.answer()
-
-    
-    except Exception as e:
-
-    
-        # Игнорируем ошибки устаревших callback-запросов
-
-    
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(StateFilter(HabitStates.waiting_for_habit_frequency))
 async def process_habit_frequency_callback(callback: types.CallbackQuery, state: FSMContext):
@@ -1751,15 +1495,7 @@ async def process_habit_frequency_callback(callback: types.CallbackQuery, state:
             frequency_text,
             reply_markup=None
         )
-        try:
-
-            await callback.answer()
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer()
         return
     
     frequency = frequency_map.get(callback.data, 1)
@@ -1767,15 +1503,7 @@ async def process_habit_frequency_callback(callback: types.CallbackQuery, state:
     
     # Завершаем создание привычки
     await finish_habit_creation(callback.message, state, callback.from_user.id)
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.message(StateFilter(HabitStates.waiting_for_habit_frequency))
 async def process_habit_frequency_text(message: types.Message, state: FSMContext):
@@ -1847,19 +1575,7 @@ async def show_my_habits(callback: types.CallbackQuery):
             parse_mode="Markdown"
         )
     
-    try:
-
-    
-        await callback.answer()
-
-    
-    except Exception as e:
-
-    
-        # Игнорируем ошибки устаревших callback-запросов
-
-    
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data.startswith("habit_detail_"))
 async def show_habit_detail(callback: types.CallbackQuery):
@@ -1872,15 +1588,7 @@ async def show_habit_detail(callback: types.CallbackQuery):
     habit = next((h for h in habits if h['habit_id'] == habit_id), None)
     
     if not habit:
-        try:
-
-            await callback.answer("❌ Привычка не найдена")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Привычка не найдена")
         return
     
     # Получаем статистику
@@ -1906,15 +1614,7 @@ async def show_habit_detail(callback: types.CallbackQuery):
         parse_mode="Markdown"
     )
     try:
-        try:
-
-            await callback.answer()
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer()
     except Exception as e:
         # Игнорируем ошибки устаревших callback-запросов
         logger.warning(f"Callback answer error (ignored): {e}")
@@ -1931,31 +1631,11 @@ async def complete_habit(callback: types.CallbackQuery):
         # Останавливаем напоминания для этой привычки
         await stop_habit_reminders(user_id, habit_id)
         
-        try:
-
-        
-            await callback.answer("✅ Привычка отмечена как выполненная!")
-
-        
-        except Exception as e:
-
-        
-            # Игнорируем ошибки устаревших callback-запросов
-
-        
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("✅ Привычка отмечена как выполненная!")
         # Обновляем информацию о привычке
         await show_habit_detail(callback)
     else:
-        try:
-
-            await callback.answer("❌ Ошибка при сохранении")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Ошибка при сохранении")
 
 @dp.callback_query(F.data.startswith("habit_skip_"))
 async def skip_habit(callback: types.CallbackQuery):
@@ -1966,27 +1646,11 @@ async def skip_habit(callback: types.CallbackQuery):
     success = db.log_habit_completion(habit_id, user_id, completed=False)
     
     if success:
-        try:
-
-            await callback.answer("❌ Привычка отмечена как пропущенная")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Привычка отмечена как пропущенная")
         # Обновляем информацию о привычке
         await show_habit_detail(callback)
     else:
-        try:
-
-            await callback.answer("❌ Ошибка при сохранении")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Ошибка при сохранении")
 
 @dp.callback_query(F.data.startswith("habit_pause_"))
 async def pause_habit(callback: types.CallbackQuery):
@@ -1997,26 +1661,10 @@ async def pause_habit(callback: types.CallbackQuery):
     success = db.toggle_habit_status(habit_id, user_id)
     
     if success:
-        try:
-
-            await callback.answer("⏸️ Привычка приостановлена")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("⏸️ Привычка приостановлена")
         await show_habit_detail(callback)
     else:
-        try:
-
-            await callback.answer("❌ Ошибка при изменении статуса")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Ошибка при изменении статуса")
 
 @dp.callback_query(F.data.startswith("habit_resume_"))
 async def resume_habit(callback: types.CallbackQuery):
@@ -2027,26 +1675,10 @@ async def resume_habit(callback: types.CallbackQuery):
     success = db.toggle_habit_status(habit_id, user_id)
     
     if success:
-        try:
-
-            await callback.answer("▶️ Привычка возобновлена")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("▶️ Привычка возобновлена")
         await show_habit_detail(callback)
     else:
-        try:
-
-            await callback.answer("❌ Ошибка при изменении статуса")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Ошибка при изменении статуса")
 
 @dp.callback_query(F.data == "habits_stats")
 async def show_habits_stats(callback: types.CallbackQuery):
@@ -2062,15 +1694,7 @@ async def show_habits_stats(callback: types.CallbackQuery):
                 reply_markup=get_habits_menu_keyboard(),
                 parse_mode="Markdown"
             )
-            try:
-
-                await callback.answer()
-
-            except Exception as e:
-
-                # Игнорируем ошибки устаревших callback-запросов
-
-                logger.warning(f"Callback answer error (ignored): {e}")
+            await callback.answer()
             return
         
         stats_text = "📊 **Статистика привычек**\n\n"
@@ -2097,27 +1721,11 @@ async def show_habits_stats(callback: types.CallbackQuery):
             reply_markup=get_habits_menu_keyboard(),
             parse_mode="Markdown"
         )
-        try:
-
-            await callback.answer()
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer()
         
     except Exception as e:
         logger.error(f"Error in show_habits_stats: {e}")
-        try:
-
-            await callback.answer("❌ Ошибка при получении статистики")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Ошибка при получении статистики")
         try:
             await callback.message.edit_text(
                 "❌ **Ошибка**\n\nНе удалось получить статистику привычек.",
@@ -2149,15 +1757,7 @@ async def calendar_menu_callback(callback: types.CallbackQuery):
         reply_markup=get_calendar_menu_keyboard(),
         parse_mode="Markdown"
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "add_event")
 async def add_event_start(callback: types.CallbackQuery, state: FSMContext):
@@ -2169,15 +1769,7 @@ async def add_event_start(callback: types.CallbackQuery, state: FSMContext):
         parse_mode="Markdown"
     )
     await state.set_state(CalendarStates.waiting_for_event_title)
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.message(StateFilter(CalendarStates.waiting_for_event_title))
 async def process_event_title(message: types.Message, state: FSMContext):
@@ -2271,15 +1863,7 @@ async def process_event_type(callback: types.CallbackQuery, state: FSMContext):
         reply_markup=get_reminder_time_keyboard()
     )
     await state.set_state(CalendarStates.waiting_for_reminder_time)
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(StateFilter(CalendarStates.waiting_for_reminder_time))
 async def process_reminder_time(callback: types.CallbackQuery, state: FSMContext):
@@ -2298,15 +1882,7 @@ async def process_reminder_time(callback: types.CallbackQuery, state: FSMContext
     
     # Завершаем создание события
     await finish_event_creation(callback.message, state, callback.from_user.id)
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 async def finish_event_creation(message, state: FSMContext, user_id: int):
     """Завершение создания события"""
@@ -2393,19 +1969,7 @@ async def show_events_today(callback: types.CallbackQuery):
             parse_mode="Markdown"
         )
     
-    try:
-
-    
-        await callback.answer()
-
-    
-    except Exception as e:
-
-    
-        # Игнорируем ошибки устаревших callback-запросов
-
-    
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "events_week")
 async def show_events_week(callback: types.CallbackQuery):
@@ -2432,19 +1996,7 @@ async def show_events_week(callback: types.CallbackQuery):
             parse_mode="Markdown"
         )
     
-    try:
-
-    
-        await callback.answer()
-
-    
-    except Exception as e:
-
-    
-        # Игнорируем ошибки устаревших callback-запросов
-
-    
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "all_events")
 async def show_all_events(callback: types.CallbackQuery):
@@ -2467,19 +2019,7 @@ async def show_all_events(callback: types.CallbackQuery):
             parse_mode="Markdown"
         )
     
-    try:
-
-    
-        await callback.answer()
-
-    
-    except Exception as e:
-
-    
-        # Игнорируем ошибки устаревших callback-запросов
-
-    
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data.startswith("event_detail_"))
 async def show_event_detail(callback: types.CallbackQuery):
@@ -2492,15 +2032,7 @@ async def show_event_detail(callback: types.CallbackQuery):
     event = next((e for e in events if e['event_id'] == event_id), None)
     
     if not event:
-        try:
-
-            await callback.answer("❌ Событие не найдено")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Событие не найдено")
         return
     
     # Форматируем информацию
@@ -2538,15 +2070,7 @@ async def show_event_detail(callback: types.CallbackQuery):
         reply_markup=get_event_detail_keyboard(event_id),
         parse_mode="Markdown"
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data.startswith("event_complete_"))
 async def complete_event(callback: types.CallbackQuery):
@@ -2557,27 +2081,11 @@ async def complete_event(callback: types.CallbackQuery):
     success = db.complete_event(event_id, user_id)
     
     if success:
-        try:
-
-            await callback.answer("✅ Событие отмечено как выполненное!")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("✅ Событие отмечено как выполненное!")
         # Обновляем информацию о событии
         await show_event_detail(callback)
     else:
-        try:
-
-            await callback.answer("❌ Ошибка при сохранении")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Ошибка при сохранении")
 
 @dp.callback_query(F.data.startswith("event_cancel_"))
 async def cancel_event(callback: types.CallbackQuery):
@@ -2588,27 +2096,11 @@ async def cancel_event(callback: types.CallbackQuery):
     success = db.delete_event(event_id, user_id)
     
     if success:
-        try:
-
-            await callback.answer("❌ Событие отменено")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Событие отменено")
         # Возвращаемся к списку событий
         await show_all_events(callback)
     else:
-        try:
-
-            await callback.answer("❌ Ошибка при удалении")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Ошибка при удалении")
 
 # Запуск бота
 async def main():
@@ -2644,15 +2136,7 @@ async def stop_reminders_handler(callback: types.CallbackQuery):
         "⏸️ Напоминания для этой привычки остановлены.",
         reply_markup=None
     )
-    try:
-
-        await callback.answer("Напоминания остановлены")
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer("Напоминания остановлены")
 
 # Обработчик настроек напоминаний
 @dp.callback_query(F.data == "reminder_settings")
@@ -2697,15 +2181,7 @@ async def show_reminder_settings(callback: types.CallbackQuery):
     )
     
     await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "change_interval")
 async def change_reminder_interval(callback: types.CallbackQuery):
@@ -2724,15 +2200,7 @@ async def change_reminder_interval(callback: types.CallbackQuery):
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data.startswith("set_interval_"))
 async def set_reminder_interval(callback: types.CallbackQuery):
@@ -2749,30 +2217,10 @@ async def set_reminder_interval(callback: types.CallbackQuery):
             3600: "1 час"
         }.get(interval, f"{interval//60} минут")
         
-        try:
-
-        
-            await callback.answer(f"✅ Интервал изменен на: каждые {interval_text}")
-
-        
-        except Exception as e:
-
-        
-            # Игнорируем ошибки устаревших callback-запросов
-
-        
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer(f"✅ Интервал изменен на: каждые {interval_text}")
         await show_reminder_settings(callback)
     else:
-        try:
-
-            await callback.answer("❌ Ошибка при сохранении настроек")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Ошибка при сохранении настроек")
 
 @dp.callback_query(F.data == "change_time_range")
 async def change_time_range(callback: types.CallbackQuery, state: FSMContext):
@@ -2784,15 +2232,7 @@ async def change_time_range(callback: types.CallbackQuery, state: FSMContext):
         parse_mode="Markdown"
     )
     await state.set_state(ReminderStates.waiting_for_start_time)
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.message(StateFilter(ReminderStates.waiting_for_start_time))
 async def process_start_time(message: types.Message, state: FSMContext):
@@ -2849,15 +2289,7 @@ async def toggle_reminders(callback: types.CallbackQuery):
     
     if success:
         if new_status:
-            try:
-
-                await callback.answer("✅ Напоминания включены")
-
-            except Exception as e:
-
-                # Игнорируем ошибки устаревших callback-запросов
-
-                logger.warning(f"Callback answer error (ignored): {e}")
+            await callback.answer("✅ Напоминания включены")
         else:
             # Останавливаем все активные напоминания пользователя
             keys_to_remove = []
@@ -2869,45 +2301,17 @@ async def toggle_reminders(callback: types.CallbackQuery):
             for key in keys_to_remove:
                 del active_reminders[key]
             
-            try:
-
-            
-                await callback.answer("❌ Напоминания отключены")
-
-            
-            except Exception as e:
-
-            
-                # Игнорируем ошибки устаревших callback-запросов
-
-            
-                logger.warning(f"Callback answer error (ignored): {e}")
+            await callback.answer("❌ Напоминания отключены")
         
         await show_reminder_settings(callback)
     else:
-        try:
-
-            await callback.answer("❌ Ошибка при сохранении настроек")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Ошибка при сохранении настроек")
 
 @dp.callback_query(F.data == "close_settings")
 async def close_settings(callback: types.CallbackQuery):
     """Закрытие настроек"""
     await callback.message.delete()
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 # Команда для тестирования напоминаний
 @dp.message(Command("test_reminders"))
@@ -3106,15 +2510,7 @@ async def profile_callback(callback: types.CallbackQuery):
         await callback.message.edit_text(
             "❌ У вас пока нет визитки. Создайте её с помощью команды /start"
         )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "networking")
 async def networking_callback(callback: types.CallbackQuery):
@@ -3126,15 +2522,7 @@ async def networking_callback(callback: types.CallbackQuery):
         "🎯 Деловые встречи\n\n"
         "Раздел в разработке..."
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "organizer")
 async def organizer_callback(callback: types.CallbackQuery):
@@ -3146,15 +2534,7 @@ async def organizer_callback(callback: types.CallbackQuery):
         "📊 Планирование\n\n"
         "Раздел в разработке..."
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "calendar")
 async def calendar_callback(callback: types.CallbackQuery):
@@ -3166,15 +2546,7 @@ async def calendar_callback(callback: types.CallbackQuery):
         "🗓️ Планирование\n\n"
         "Раздел в разработке..."
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "settings")
 async def settings_callback(callback: types.CallbackQuery):
@@ -3194,15 +2566,7 @@ async def settings_callback(callback: types.CallbackQuery):
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "notification_settings")
 async def notification_settings_callback(callback: types.CallbackQuery):
@@ -3216,15 +2580,7 @@ async def notification_settings_callback(callback: types.CallbackQuery):
             ]
         )
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "language_settings")
 async def language_settings_callback(callback: types.CallbackQuery):
@@ -3240,15 +2596,7 @@ async def language_settings_callback(callback: types.CallbackQuery):
             ]
         )
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 
 @dp.callback_query(F.data == "timezone_settings")
@@ -3280,15 +2628,7 @@ async def timezone_settings_callback(callback: types.CallbackQuery):
     )
     
     await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data == "change_timezone")
 async def change_timezone_callback(callback: types.CallbackQuery):
@@ -3311,15 +2651,7 @@ async def change_timezone_callback(callback: types.CallbackQuery):
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data.startswith("set_timezone_"))
 async def set_timezone_callback(callback: types.CallbackQuery):
@@ -3339,30 +2671,10 @@ async def set_timezone_callback(callback: types.CallbackQuery):
             "UTC": "🌍 UTC (UTC+0)"
         }
         
-        try:
-
-        
-            await callback.answer(f"✅ Часовой пояс изменен на {timezone_names.get(timezone, timezone)
-
-        
-        except Exception as e:
-
-        
-            # Игнорируем ошибки устаревших callback-запросов
-
-        
-            logger.warning(f"Callback answer error (ignored): {e}")}")
+        await callback.answer(f"✅ Часовой пояс изменен на {timezone_names.get(timezone, timezone)}")
         await timezone_settings_callback(callback)
     else:
-        try:
-
-            await callback.answer("❌ Ошибка при сохранении")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Ошибка при сохранении")
 
 @dp.callback_query(F.data == "change_start_hour")
 async def change_start_hour_callback(callback: types.CallbackQuery):
@@ -3389,15 +2701,7 @@ async def change_start_hour_callback(callback: types.CallbackQuery):
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data.startswith("set_start_hour_"))
 async def set_start_hour_callback(callback: types.CallbackQuery):
@@ -3408,26 +2712,10 @@ async def set_start_hour_callback(callback: types.CallbackQuery):
     success = db.update_user_timezone_settings(user_id, push_start_hour=hour)
     
     if success:
-        try:
-
-            await callback.answer(f"✅ Время начала изменено на {hour:02d}:00")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer(f"✅ Время начала изменено на {hour:02d}:00")
         await timezone_settings_callback(callback)
     else:
-        try:
-
-            await callback.answer("❌ Ошибка при сохранении")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Ошибка при сохранении")
 
 @dp.callback_query(F.data == "change_end_hour")
 async def change_end_hour_callback(callback: types.CallbackQuery):
@@ -3454,15 +2742,7 @@ async def change_end_hour_callback(callback: types.CallbackQuery):
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
-    try:
-
-        await callback.answer()
-
-    except Exception as e:
-
-        # Игнорируем ошибки устаревших callback-запросов
-
-        logger.warning(f"Callback answer error (ignored): {e}")
+    await callback.answer()
 
 @dp.callback_query(F.data.startswith("set_end_hour_"))
 async def set_end_hour_callback(callback: types.CallbackQuery):
@@ -3473,26 +2753,10 @@ async def set_end_hour_callback(callback: types.CallbackQuery):
     success = db.update_user_timezone_settings(user_id, push_end_hour=hour)
     
     if success:
-        try:
-
-            await callback.answer(f"✅ Время окончания изменено на {hour:02d}:00")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer(f"✅ Время окончания изменено на {hour:02d}:00")
         await timezone_settings_callback(callback)
     else:
-        try:
-
-            await callback.answer("❌ Ошибка при сохранении")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Ошибка при сохранении")
 
 @dp.callback_query(F.data == "toggle_push")
 async def toggle_push_callback(callback: types.CallbackQuery):
@@ -3505,26 +2769,10 @@ async def toggle_push_callback(callback: types.CallbackQuery):
     
     if success:
         status_text = "включены" if new_status else "отключены"
-        try:
-
-            await callback.answer(f"✅ Push-уведомления {status_text}")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer(f"✅ Push-уведомления {status_text}")
         await timezone_settings_callback(callback)
     else:
-        try:
-
-            await callback.answer("❌ Ошибка при сохранении")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Ошибка при сохранении")
 
 
 @dp.callback_query(F.data.startswith("quick_habit_"))
@@ -3537,15 +2785,7 @@ async def quick_habit_complete(callback: types.CallbackQuery):
         # Получаем информацию о привычке
         habit = db.get_habit_by_id(habit_id)
         if not habit or habit['user_id'] != user_id:
-            try:
-
-                await callback.answer("❌ Привычка не найдена")
-
-            except Exception as e:
-
-                # Игнорируем ошибки устаревших callback-запросов
-
-                logger.warning(f"Callback answer error (ignored): {e}")
+            await callback.answer("❌ Привычка не найдена")
             return
         
         # Отмечаем выполнение
@@ -3617,41 +2857,13 @@ async def quick_habit_complete(callback: types.CallbackQuery):
                     reply_markup=None
                 )
             
-            try:
-
-            
-                await callback.answer(f"✅ {habit_name} отмечена как выполненная!")
-
-            
-            except Exception as e:
-
-            
-                # Игнорируем ошибки устаревших callback-запросов
-
-            
-                logger.warning(f"Callback answer error (ignored): {e}")
+            await callback.answer(f"✅ {habit_name} отмечена как выполненная!")
             
         else:
-            try:
-
-                await callback.answer("❌ Ошибка при сохранении")
-
-            except Exception as e:
-
-                # Игнорируем ошибки устаревших callback-запросов
-
-                logger.warning(f"Callback answer error (ignored): {e}")
+            await callback.answer("❌ Ошибка при сохранении")
             
     except Exception as e:
         logger.error(f"Error in quick_habit_complete: {e}")
-        try:
-
-            await callback.answer("❌ Произошла ошибка")
-
-        except Exception as e:
-
-            # Игнорируем ошибки устаревших callback-запросов
-
-            logger.warning(f"Callback answer error (ignored): {e}")
+        await callback.answer("❌ Произошла ошибка")
 
 
